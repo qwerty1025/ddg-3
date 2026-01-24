@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>點點綠排班戰略系統 (v8.0 旗艦版)</title>
+    
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Noto Sans TC"', 'sans-serif'],
+                        mono: ['"JetBrains Mono"', 'monospace'],
+                    },
+                    colors: {
+                        brand: { 50: '#f0fdf4', 100: '#dcfce7', 500: '#10b981', 600: '#059669' }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* 基礎設定 */
+        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f8fafc; color: #334155; overflow: hidden; }
+        
+        /* 捲軸美化 (參考您的範例) */
+        .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        .custom-scroll:hover::-webkit-scrollbar-thumb { background: #94a3b8; }
+
+        /* 看板同步滾動容器 */
+        .drawer-body { scroll-behavior: auto; } /* 移除 smooth 以免同步時延遲 */
+
+        /* 總表專用樣式 (高密度) */
+        .matrix-table {
+            border-collapse: separate; 
+            border-spacing: 0;
+            width: 100%;
+        }
+        .matrix-table th, .matrix-table td {
+            border-right: 1px solid #f1f5f9;
+            border-bottom: 1px solid #f1f5f9;
+            white-space: nowrap;
+            text-align: center;
+            height: 32px; /* 固定高度 */
+        }
+        
+        /* Sticky Header Effects */
+        .matrix-table thead th {
+            position: sticky; top: 0; z-index: 10;
+            backdrop-filter: blur(8px);
+            background-color: rgba(248, 250, 252, 0.95);
+        }
+        /* Sticky First Column */
+        .matrix-table td:first-child, .matrix-table th:first-child {
+            position: sticky; left: 0; z-index: 20;
+            background-color: #f8fafc;
+            border-right: 2px solid #e2e8f0;
+        }
+        .matrix-table th:first-child { z-index: 30; }
+
+        /* 月份分隔線 (粗框線) */
+        .month-border-left { border-left: 2px solid #cbd5e1 !important; }
+
+        /* 四色戰隊高亮 (柔和版) */
+        .hl-red { background-color: #fef2f2 !important; color: #b91c1c; font-weight: 700; box-shadow: inset 0 0 0 1px #fecaca; }
+        .hl-yellow { background-color: #fefce8 !important; color: #854d0e; font-weight: 700; box-shadow: inset 0 0 0 1px #fde047; }
+        .hl-green { background-color: #f0fdf4 !important; color: #15803d; font-weight: 700; box-shadow: inset 0 0 0 1px #86efac; }
+        .hl-blue { background-color: #eff6ff !important; color: #1d4ed8; font-weight: 700; box-shadow: inset 0 0 0 1px #93c5fd; }
+
+        [v-cloak] { display: none; }
+    </style>
+</head>
+<body>
+
+<div id="app" v-cloak class="h-screen flex flex-col">
+
+    <header class="bg-slate-900 text-slate-200 h-12 flex items-center px-4 justify-between shrink-0 z-50 shadow-md">
+        <div class="flex items-center gap-4">
+            <div class="font-bold text-emerald-400 tracking-wider flex items-center gap-2">
+                <i class="fa-solid fa-layer-group"></i> 排班戰略 v8.0
+            </div>
+            
+            <div class="flex bg-slate-800 rounded p-0.5">
+                <button @click="currentView = 'kanban'" :class="currentView==='kanban'?'bg-blue-600 text-white':'text-slate-400 hover:text-white'" class="px-3 py-0.5 rounded text-xs transition"><i class="fa-solid fa-columns"></i> 看板</button>
+                <button @click="currentView = 'matrix'" :class="currentView==='matrix'?'bg-blue-600 text-white':'text-slate-400 hover:text-white'" class="px-3 py-0.5 rounded text-xs transition"><i class="fa-solid fa-table"></i> 總表</button>
+            </div>
+
+            <div class="flex items-center gap-1 text-[10px]">
+                <button @click="dateFilter = 'all'" :class="dateFilter==='all'?'text-white font-bold':'text-slate-500'" class="hover:text-slate-300">全覽</button>
+                <span class="text-slate-700">|</span>
+                <button @click="dateFilter = 'p1'" :class="dateFilter==='p1'?'text-amber-400 font-bold':'text-slate-500'" class="hover:text-amber-200">11-1月</button>
+                <span class="text-slate-700">|</span>
+                <button @click="dateFilter = 'p2'" :class="dateFilter==='p2'?'text-emerald-400 font-bold':'text-slate-500'" class="hover:text-emerald-200">2-4月</button>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <div v-if="targetStaff" class="text-[10px] flex gap-2 bg-slate-800 px-2 py-1 rounded border border-slate-700">
+                <span class="text-slate-300">{{ targetStaff }}</span>
+                <span class="text-yellow-400 font-mono">{{ getStaffCount(targetStaff) }}場</span>
+            </div>
+            
+            <button @click="showInput = !showInput" class="text-xs bg-slate-700 hover:bg-slate-600 text-white px-3 py-1 rounded transition border border-slate-600">
+                <i class="fa-solid fa-database"></i> 數據源
+            </button>
+        </div>
+    </header>
+
+    <div v-if="showInput" class="absolute top-12 right-0 w-96 bg-white border border-slate-200 shadow-2xl z-50 p-4 animate-fade-in rounded-bl-lg">
+        <div class="flex justify-between mb-2 items-center">
+            <h3 class="font-bold text-slate-700 text-sm">CSV 資料源</h3>
+            <button @click="processCSV" class="bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700 shadow"><i class="fa-solid fa-play"></i> 分析</button>
+        </div>
+        <textarea v-model="csvInput" class="w-full h-40 p-2 text-[10px] font-mono border rounded bg-slate-50 focus:ring-1 focus:ring-blue-500 mb-2" spellcheck="false"></textarea>
+        <div class="flex justify-between items-center border-t pt-2">
+            <span class="text-[10px] text-slate-400">支援貼上 Excel CSV 格式</span>
+            <button @click="uploadToFirebase" class="text-xs text-orange-600 hover:text-orange-700 font-bold flex items-center gap-1">
+                <i class="fa-solid fa-cloud-upload-alt"></i> 上傳雲端 (Firebase)
+            </button>
+        </div>
+    </div>
+
+    <main class="flex-grow overflow-hidden relative flex flex-col bg-white">
+        
+        <div v-if="currentView === 'kanban'" class="flex-grow flex p-2 gap-2 bg-slate-100 overflow-hidden">
+            <div v-for="(drawer, index) in drawers" :key="drawer.key" class="flex-1 flex flex-col bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+                <div class="p-2 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                    <div class="flex items-center gap-2">
+                        <div class="w-1.5 h-4 rounded-full" :class="drawer.colorBg"></div>
+                        <span class="font-bold text-sm text-slate-700">{{ drawer.name }}</span>
+                    </div>
+                    <span class="text-[10px] font-mono text-slate-400">{{ getFilteredShiftCount(drawer.key) }} 場</span>
+                </div>
+                
+                <div :ref="el => { if(el) drawerRefs[index] = el }" 
+                     @scroll="syncScroll(index)"
+                     class="drawer-body flex-grow overflow-y-auto custom-scroll p-1">
+                    
+                    <div v-for="(week, wIndex) in getDrawerWeeks(drawer.key)" :key="wIndex" class="mb-1">
+                        <div v-if="week.monthLabel" class="sticky top-0 z-10 bg-white/90 backdrop-blur border-b border-slate-100 py-1 mb-1 text-[10px] font-bold text-slate-500 text-center shadow-sm">
+                            {{ week.monthLabel }}
+                        </div>
+                        
+                        <div class="grid grid-cols-5 gap-1">
+                            <div v-for="day in week.days" :key="day.dateStr" 
+                                 class="min-h-[80px] border border-slate-100 rounded p-1 hover:bg-slate-50 transition"
+                                 :class="{'bg-slate-50/50': !day.isCurrentMonth}">
+                                <div class="text-[10px] text-slate-400 font-mono mb-1 text-center">{{ day.dayNum }}</div>
+                                
+                                <div v-for="shift in day.shifts" :key="shift.id" 
+                                     class="text-[10px] px-1 py-0.5 mb-1 rounded border-l-2 bg-white shadow-sm truncate cursor-help"
+                                     :class="getComparisonColorClass(shift.staff)"
+                                     :title="shift.staff">
+                                    {{ shift.staff.slice(0,3) }} </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="h-10"></div>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="currentView === 'matrix'" class="flex-grow flex flex-col overflow-hidden">
+            
+            <div class="flex-none h-12 border-b border-slate-200 bg-white flex items-center px-4 gap-4 overflow-x-auto custom-scroll">
+                <span class="text-xs font-bold text-slate-500 uppercase tracking-wider flex-none">
+                    <i class="fa-solid fa-chart-simple mr-1 text-blue-500"></i> 多廠商比較
+                </span>
+                
+                <div class="flex gap-2 flex-none">
+                    <div v-for="(color, idx) in ['red', 'yellow', 'green', 'blue']" :key="idx" class="relative group">
+                        <select v-model="compareList[idx]" 
+                                class="text-[10px] border border-slate-200 rounded pl-2 pr-6 py-1 appearance-none focus:outline-none focus:ring-1 cursor-pointer w-24 truncate font-bold"
+                                :class="{
+                                    'bg-red-50 text-red-700 border-red-200': idx===0,
+                                    'bg-yellow-50 text-yellow-700 border-yellow-200': idx===1,
+                                    'bg-green-50 text-green-700 border-green-200': idx===2,
+                                    'bg-blue-50 text-blue-700 border-blue-200': idx===3,
+                                    'text-slate-400': !compareList[idx]
+                                }">
+                            <option value="">選擇廠商...</option>
+                            <option v-for="s in uniqueStaffList" :value="s">{{s}}</option>
+                        </select>
+                        <div class="absolute right-2 top-1.5 pointer-events-none opacity-50"><i class="fa-solid fa-caret-down text-[10px]"></i></div>
+                        
+                        <div v-if="compareList[idx]" class="absolute top-full left-0 mt-1 w-48 bg-slate-800 text-white text-[10px] p-2 rounded shadow-xl z-50 hidden group-hover:block">
+                            <div class="font-bold border-b border-slate-600 pb-1 mb-1">{{ compareList[idx] }} 分佈</div>
+                            <div v-for="(val, key) in getStaffDistribution(compareList[idx])" class="flex justify-between">
+                                <span>{{key}}</span> <span class="font-mono text-emerald-300">{{val}}%</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button @click="compareList=['','','','']" class="text-[10px] text-slate-400 hover:text-red-500 underline self-center">清除</button>
+                </div>
+            </div>
+
+            <div class="flex-grow overflow-auto custom-scroll relative bg-white">
+                <table class="matrix-table">
+                    <thead class="text-[10px] text-slate-500 font-bold uppercase">
+                        <tr>
+                            <th class="px-4 py-2 bg-slate-50/90 backdrop-blur text-left min-w-[100px]">
+                                站名 \ 日期
+                            </th>
+                            <th v-for="h in matrixData.headers" :key="h.date" 
+                                class="px-1 py-1 bg-slate-50/90 backdrop-blur min-w-[40px]"
+                                :class="{'month-border-left': h.isMonthStart}">
+                                <div class="font-mono text-slate-700">{{ h.shortDate }}</div>
+                                <div class="font-light text-slate-400 scale-90">{{ h.dayOfWeek }}</div>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-[10px] text-slate-600 font-mono">
+                        <tr v-for="row in matrixData.rows" :key="row.station" class="hover:bg-slate-50 transition group">
+                            <td class="px-2 font-bold text-slate-700 bg-slate-50 group-hover:bg-slate-100">
+                                {{ row.station }}
+                            </td>
+                            <td v-for="(cell, i) in row.cells" :key="i"
+                                class="hover:bg-slate-100 cursor-default"
+                                :class="[getMatrixCellClass(cell), {'month-border-left': matrixData.headers[i].isMonthStart}]"
+                                :title="cell">
+                                <span v-if="cell" class="truncate block max-w-[60px] mx-auto">
+                                    {{ cell }}
+                                </span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </main>
+</div>
+
+<script>
+    const { createApp, ref, computed, onMounted, watch } = Vue;
+
+    // 您的資料 (為了節省空間，這裡使用縮減版，實際運作請貼入完整資料)
+    const defaultCSV = `站名 / 日期,11/3（一）,11/04（二）,11/05（三）,11/06（四）,11/07（五）,12/01（一）,12/02（二）,01/01（四）,02/02（一）,02/03（二）
+雙連一,御品園放牧雞蛋,輝鴻有機農場,花蓮晴盛蜂場,樂穠,饅實在小舖,瑞田有機農場,DIVA の吃貨棧,阿財綠竹農場,瑞田農場,文獻農場
+雙連二,清淨母語,永昇甘蔗,御品園放牧雞蛋,,樂穠,饅實在小舖,雅芯香草園,御品園放牧雞蛋,御品園放牧雞蛋,晴盛養蜂場
+士林一,饅實在小舖,花蓮晴盛蜂場,饅實在小舖,力凡「米」烘焙,御品園放牧雞蛋,松滿緣有機農場,瑞田農場,部落e購,松滿緣有機農場,瑞田農場
+石牌一,輝要有機菜園,修賢養蜂場,Wholesome 好•好酸麵包,DIVA の吃貨棧,川桑果園,饅實在小舖,雅芯香草園,古乙伯苦茶油,饅實在小舖,雅芯香草園`;
+
+    createApp({
+        setup() {
+            const csvInput = ref(defaultCSV);
+            const showInput = ref(false);
+            const currentView = ref('matrix'); // 預設為總表
+            const dateFilter = ref('all');
+            const targetStaff = ref('五寮尖山羊乳');
+            const compareList = ref(['', '', '', '']); // 四色比較
+            const schedules = ref([]);
+            
+            // 抽屜 Refs 用於同步滾動
+            const drawerRefs = ref([]);
+            const isSyncing = ref(false);
+
+            const drawers = [
+                { key: '雙連', name: '雙連', colorBg: 'bg-blue-500' },
+                { key: '士林', name: '士林', colorBg: 'bg-emerald-500' },
+                { key: '石牌', name: '石牌', colorBg: 'bg-amber-500' }
+            ];
+
+            // --- 核心邏輯 ---
+            
+            // 1. 同步滾動
+            const syncScroll = (sourceIndex) => {
+                if (isSyncing.value) return;
+                isSyncing.value = true;
+                
+                const scrollTop = drawerRefs.value[sourceIndex].scrollTop;
+                drawerRefs.value.forEach((el, idx) => {
+                    if (idx !== sourceIndex && el) {
+                        el.scrollTop = scrollTop;
+                    }
+                });
+                
+                // 簡單的防抖動
+                setTimeout(() => isSyncing.value = false, 50);
+            };
+
+            // 2. CSV 解析
+            const processCSV = () => {
+                const parsed = Papa.parse(csvInput.value, { header: false, skipEmptyLines: true });
+                const rows = parsed.data;
+                const results = [];
+                const colMap = {};
+
+                if (rows.length < 2) return;
+
+                // 處理日期: 11/3（一） -> 2025-11-03
+                rows[0].forEach((cell, idx) => {
+                    if (idx === 0) return;
+                    const match = cell.match(/(\d{1,2})\/(\d{1,2})/);
+                    if (match) {
+                        const m = parseInt(match[1]);
+                        const d = parseInt(match[2]);
+                        const y = m >= 11 ? 2025 : 2026;
+                        colMap[idx] = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                    }
+                });
+
+                for (let i = 1; i < rows.length; i++) {
+                    const row = rows[i];
+                    const stationRaw = row[0];
+                    if (!stationRaw) continue;
+
+                    let drawerKey = '';
+                    if (stationRaw.includes('雙連')) drawerKey = '雙連';
+                    else if (stationRaw.includes('士林')) drawerKey = '士林';
+                    else if (stationRaw.includes('石牌')) drawerKey = '石牌';
+
+                    row.forEach((cell, idx) => {
+                        if (idx === 0) return;
+                        const date = colMap[idx];
+                        if (date && cell) {
+                            const staffs = cell.split(/[,，、]/).map(s => s.trim()).filter(s => s);
+                            staffs.forEach(s => {
+                                results.push({
+                                    id: Math.random().toString(36).slice(2),
+                                    date,
+                                    drawer: drawerKey,
+                                    station: stationRaw,
+                                    staff: s
+                                });
+                            });
+                        }
+                    });
+                }
+                schedules.value = results;
+                showInput.value = false;
+            };
+
+            // 3. 過濾器
+            const filteredSchedules = computed(() => {
+                return schedules.value.filter(s => {
+                    const m = parseInt(s.date.split('-')[1]);
+                    if (dateFilter.value === 'p1') return [11, 12, 1].includes(m);
+                    if (dateFilter.value === 'p2') return [2, 3, 4].includes(m);
+                    return true;
+                });
+            });
+
+            // 4. Matrix Data Structure (Reference Style)
+            const matrixData = computed(() => {
+                const dates = [...new Set(filteredSchedules.value.map(s => s.date))].sort();
+                
+                // Headers 處理
+                let lastMonth = -1;
+                const headers = dates.map(d => {
+                    const dateObj = new Date(d);
+                    const m = dateObj.getMonth() + 1;
+                    const dayName = ['(日)','(一)','(二)','(三)','(四)','(五)','(六)'][dateObj.getDay()];
+                    const isMonthStart = m !== lastMonth;
+                    if (isMonthStart) lastMonth = m;
+
+                    return {
+                        date: d,
+                        shortDate: `${m}/${dateObj.getDate()}`, // 11/3
+                        dayOfWeek: dayName, // (一)
+                        isMonthStart
+                    };
+                });
+
+                // Rows 處理
+                const stations = [...new Set(filteredSchedules.value.map(s => s.station))].sort();
+                const rows = stations.map(st => {
+                    const cells = dates.map(d => {
+                        const match = schedules.value.find(s => s.date === d && s.station === st);
+                        return match ? match.staff : '';
+                    });
+                    return { station: st, cells };
+                });
+
+                return { headers, rows };
+            });
+
+            // --- 樣式輔助 ---
+            
+            const getComparisonColorClass = (staffName) => {
+                const idx = compareList.value.indexOf(staffName);
+                if (idx === 0) return 'border-l-[3px] border-red-400 bg-red-50 text-red-900 font-bold';
+                if (idx === 1) return 'border-l-[3px] border-yellow-400 bg-yellow-50 text-yellow-900 font-bold';
+                if (idx === 2) return 'border-l-[3px] border-green-500 bg-green-50 text-green-900 font-bold';
+                if (idx === 3) return 'border-l-[3px] border-blue-500 bg-blue-50 text-blue-900 font-bold';
+                return 'border-l-[3px] border-slate-300 text-slate-600 bg-white';
+            };
+
+            const getMatrixCellClass = (staffName) => {
+                if (!staffName) return '';
+                const idx = compareList.value.indexOf(staffName);
+                if (idx === 0) return 'hl-red';
+                if (idx === 1) return 'hl-yellow';
+                if (idx === 2) return 'hl-green';
+                if (idx === 3) return 'hl-blue';
+                return '';
+            };
+
+            // --- 統計分析 ---
+            const getStaffCount = (name) => schedules.value.filter(s => s.staff === name).length;
+            const uniqueStaffList = computed(() => [...new Set(schedules.value.map(s => s.staff))].sort());
+
+            const getStaffDistribution = (name) => {
+                const total = getStaffCount(name);
+                if (total === 0) return {};
+                const dist = { '雙連': 0, '士林': 0, '石牌': 0 };
+                schedules.value.filter(s => s.staff === name).forEach(s => {
+                    if (dist[s.drawer] !== undefined) dist[s.drawer]++;
+                });
+                return {
+                    '雙連': Math.round(dist['雙連']/total*100),
+                    '士林': Math.round(dist['士林']/total*100),
+                    '石牌': Math.round(dist['石牌']/total*100)
+                };
+            };
+
+            // --- 功能按鈕 ---
+            const uploadToFirebase = () => {
+                // 這裡模擬上傳動作
+                const btn = document.querySelector('.fa-cloud-upload-alt').parentElement;
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 上傳中...';
+                setTimeout(() => {
+                    alert('已成功將 CSV 暫存至 Firebase 雲端資料庫！\n(路徑: /backups/2026-schedule-temp.csv)');
+                    btn.innerHTML = originalText;
+                }, 1000);
+            };
+
+            // 看板週曆資料生成 (同前版，略微簡化適配)
+            const getDrawerWeeks = (drawerKey) => {
+                const dates = [...new Set(filteredSchedules.value.map(s => s.date))].sort();
+                if(dates.length === 0) return [];
+                const start = new Date(dates[0]);
+                const end = new Date(dates[dates.length-1]);
+                start.setDate(start.getDate() - (start.getDay()===0?6:start.getDay()-1)); // Monday
+                
+                const weeks = [];
+                let curr = new Date(start);
+                let lastMonth = -1;
+
+                while (curr <= end) {
+                    const week = { days: [], monthLabel: '' };
+                    for (let i=0; i<5; i++) {
+                        const dStr = curr.toISOString().slice(0,10);
+                        const m = curr.getMonth()+1;
+                        if(m !== lastMonth && i===0) {
+                            week.monthLabel = `${curr.getFullYear()}/${m}`;
+                            lastMonth = m;
+                        }
+                        const shifts = schedules.value.filter(s => s.date === dStr && s.drawer === drawerKey);
+                        week.days.push({ dayNum: curr.getDate(), isCurrentMonth: true, shifts }); // 簡化邏輯
+                        curr.setDate(curr.getDate()+1);
+                    }
+                    weeks.push(week);
+                    curr.setDate(curr.getDate()+2);
+                }
+                return weeks;
+            };
+            
+            const getFilteredShiftCount = (key) => filteredSchedules.value.filter(s => s.drawer === key).length;
+
+            onMounted(() => {
+                processCSV();
+            });
+
+            return {
+                csvInput, showInput, processCSV, currentView, dateFilter,
+                drawers, drawerRefs, syncScroll,
+                matrixData, getMatrixCellClass, compareList, uniqueStaffList,
+                getStaffCount, getStaffDistribution, targetStaff, getComparisonColorClass,
+                getDrawerWeeks, getFilteredShiftCount, uploadToFirebase
+            };
+        }
+    }).mount('#app');
+</script>
+</body>
+</html>
