@@ -3,80 +3,115 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>點點綠排班戰略系統 (v8.0 旗艦版)</title>
+    <title>點點綠排班戰略系統 v8.0</title>
     
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
 
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['"Noto Sans TC"', 'sans-serif'],
-                        mono: ['"JetBrains Mono"', 'monospace'],
-                    },
-                    colors: {
-                        brand: { 50: '#f0fdf4', 100: '#dcfce7', 500: '#10b981', 600: '#059669' }
-                    }
-                }
-            }
-        }
-    </script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <style>
-        /* 基礎設定 */
-        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f8fafc; color: #334155; overflow: hidden; }
-        
-        /* 捲軸美化 (參考您的範例) */
+        /* 全域字體設定 */
+        body { 
+            font-family: 'Noto Sans TC', sans-serif; 
+            background-color: #f8fafc; 
+            color: #334155;
+            overflow: hidden; /* 防止整個頁面滾動 */
+        }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* 自定義捲軸 */
         .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
-        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        .custom-scroll::-webkit-scrollbar-track { background: #f1f5f9; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
         .custom-scroll:hover::-webkit-scrollbar-thumb { background: #94a3b8; }
 
-        /* 看板同步滾動容器 */
-        .drawer-body { scroll-behavior: auto; } /* 移除 smooth 以免同步時延遲 */
-
-        /* 總表專用樣式 (高密度) */
+        /* [總表] Matrix 樣式優化 */
+        .matrix-container {
+            overflow: auto;
+            height: calc(100vh - 160px);
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
         .matrix-table {
             border-collapse: separate; 
             border-spacing: 0;
             width: 100%;
+            font-size: 0.75rem; /* text-xs */
         }
         .matrix-table th, .matrix-table td {
-            border-right: 1px solid #f1f5f9;
-            border-bottom: 1px solid #f1f5f9;
+            border-right: 1px solid #e2e8f0;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 4px 8px;
             white-space: nowrap;
             text-align: center;
-            height: 32px; /* 固定高度 */
+            height: 32px;
         }
-        
-        /* Sticky Header Effects */
+        /* 凍結表頭 */
         .matrix-table thead th {
-            position: sticky; top: 0; z-index: 10;
-            backdrop-filter: blur(8px);
-            background-color: rgba(248, 250, 252, 0.95);
-        }
-        /* Sticky First Column */
-        .matrix-table td:first-child, .matrix-table th:first-child {
-            position: sticky; left: 0; z-index: 20;
             background-color: #f8fafc;
-            border-right: 2px solid #e2e8f0;
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            font-weight: 700;
+            color: #475569;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
         }
-        .matrix-table th:first-child { z-index: 30; }
+        /* 凍結左側站名 */
+        .matrix-table td:first-child, .matrix-table th:first-child {
+            position: sticky;
+            left: 0;
+            background-color: #fff;
+            z-index: 30;
+            font-weight: 700;
+            text-align: left;
+            border-right: 2px solid #64748b; /* 加粗分割線 */
+            color: #1e293b;
+        }
+        .matrix-table th:first-child { z-index: 40; background-color: #f1f5f9; }
 
-        /* 月份分隔線 (粗框線) */
-        .month-border-left { border-left: 2px solid #cbd5e1 !important; }
+        /* [總表] 分區加強顯示 */
+        .station-divider {
+            border-top: 3px solid #334155 !important; /* 強力分隔線 */
+        }
+        .station-group-bg-odd { background-color: #ffffff; }
+        .station-group-bg-even { background-color: #f8fafc; } /* 斑馬紋 */
 
-        /* 四色戰隊高亮 (柔和版) */
-        .hl-red { background-color: #fef2f2 !important; color: #b91c1c; font-weight: 700; box-shadow: inset 0 0 0 1px #fecaca; }
-        .hl-yellow { background-color: #fefce8 !important; color: #854d0e; font-weight: 700; box-shadow: inset 0 0 0 1px #fde047; }
-        .hl-green { background-color: #f0fdf4 !important; color: #15803d; font-weight: 700; box-shadow: inset 0 0 0 1px #86efac; }
-        .hl-blue { background-color: #eff6ff !important; color: #1d4ed8; font-weight: 700; box-shadow: inset 0 0 0 1px #93c5fd; }
+        /* [看板] Kanban 樣式 */
+        .kanban-col {
+            flex: 1;
+            min-width: 320px;
+            background: #f1f5f9;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
+        }
+        .shift-card {
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            margin-bottom: 2px;
+            background: white;
+            border-radius: 4px;
+            border-left: 3px solid #cbd5e1;
+            box-shadow: 0 1px 1px rgba(0,0,0,0.05);
+            cursor: pointer;
+            transition: all 0.1s;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .shift-card:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+
+        /* 四色戰隊高亮樣式 */
+        .hl-red { background-color: #fef2f2 !important; color: #b91c1c; border-left-color: #ef4444 !important; font-weight: bold; }
+        .hl-yellow { background-color: #fefce8 !important; color: #854d0e; border-left-color: #eab308 !important; font-weight: bold; }
+        .hl-green { background-color: #f0fdf4 !important; color: #15803d; border-left-color: #22c55e !important; font-weight: bold; }
+        .hl-blue { background-color: #eff6ff !important; color: #1e40af; border-left-color: #3b82f6 !important; font-weight: bold; }
 
         [v-cloak] { display: none; }
     </style>
@@ -85,84 +120,92 @@
 
 <div id="app" v-cloak class="h-screen flex flex-col">
 
-    <header class="bg-slate-900 text-slate-200 h-12 flex items-center px-4 justify-between shrink-0 z-50 shadow-md">
+    <header class="h-14 bg-slate-900 text-white flex items-center justify-between px-4 shadow-md z-50 shrink-0">
         <div class="flex items-center gap-4">
-            <div class="font-bold text-emerald-400 tracking-wider flex items-center gap-2">
-                <i class="fa-solid fa-layer-group"></i> 排班戰略 v8.0
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 bg-emerald-500 rounded flex items-center justify-center font-bold text-white shadow-lg shadow-emerald-500/50">G</div>
+                <h1 class="font-bold text-lg tracking-wide">排班戰略 <span class="text-xs text-slate-400 font-normal opacity-70">v8.0</span></h1>
             </div>
             
-            <div class="flex bg-slate-800 rounded p-0.5">
-                <button @click="currentView = 'kanban'" :class="currentView==='kanban'?'bg-blue-600 text-white':'text-slate-400 hover:text-white'" class="px-3 py-0.5 rounded text-xs transition"><i class="fa-solid fa-columns"></i> 看板</button>
-                <button @click="currentView = 'matrix'" :class="currentView==='matrix'?'bg-blue-600 text-white':'text-slate-400 hover:text-white'" class="px-3 py-0.5 rounded text-xs transition"><i class="fa-solid fa-table"></i> 總表</button>
-            </div>
-
-            <div class="flex items-center gap-1 text-[10px]">
-                <button @click="dateFilter = 'all'" :class="dateFilter==='all'?'text-white font-bold':'text-slate-500'" class="hover:text-slate-300">全覽</button>
-                <span class="text-slate-700">|</span>
-                <button @click="dateFilter = 'p1'" :class="dateFilter==='p1'?'text-amber-400 font-bold':'text-slate-500'" class="hover:text-amber-200">11-1月</button>
-                <span class="text-slate-700">|</span>
-                <button @click="dateFilter = 'p2'" :class="dateFilter==='p2'?'text-emerald-400 font-bold':'text-slate-500'" class="hover:text-emerald-200">2-4月</button>
+            <div class="bg-slate-800 p-1 rounded flex gap-1">
+                <button @click="currentView='kanban'" :class="currentView==='kanban'?'bg-emerald-600 text-white shadow':'text-slate-400 hover:text-white'" class="px-3 py-1 text-xs rounded transition"><i class="fa-solid fa-columns"></i> 看板</button>
+                <button @click="currentView='matrix'" :class="currentView==='matrix'?'bg-emerald-600 text-white shadow':'text-slate-400 hover:text-white'" class="px-3 py-1 text-xs rounded transition"><i class="fa-solid fa-table-cells"></i> 總表</button>
+                <button @click="currentView='analysis'" :class="currentView==='analysis'?'bg-emerald-600 text-white shadow':'text-slate-400 hover:text-white'" class="px-3 py-1 text-xs rounded transition"><i class="fa-solid fa-chart-pie"></i> 分析</button>
             </div>
         </div>
 
-        <div class="flex items-center gap-3">
-            <div v-if="targetStaff" class="text-[10px] flex gap-2 bg-slate-800 px-2 py-1 rounded border border-slate-700">
-                <span class="text-slate-300">{{ targetStaff }}</span>
-                <span class="text-yellow-400 font-mono">{{ getStaffCount(targetStaff) }}場</span>
-            </div>
-            
-            <button @click="showInput = !showInput" class="text-xs bg-slate-700 hover:bg-slate-600 text-white px-3 py-1 rounded transition border border-slate-600">
-                <i class="fa-solid fa-database"></i> 數據源
+        <div class="hidden md:flex items-center gap-2 bg-slate-800 px-3 py-1 rounded border border-slate-700">
+            <span class="text-xs text-slate-400"><i class="fa-solid fa-people-arrows"></i> PK:</span>
+            <select v-model="compareList[0]" class="bg-red-900/30 text-red-200 border-red-900 text-xs rounded px-1 outline-none"><option value="">紅隊</option><option v-for="s in uniqueStaffList" :value="s">{{s}}</option></select>
+            <select v-model="compareList[1]" class="bg-yellow-900/30 text-yellow-200 border-yellow-900 text-xs rounded px-1 outline-none"><option value="">黃隊</option><option v-for="s in uniqueStaffList" :value="s">{{s}}</option></select>
+            <select v-model="compareList[2]" class="bg-green-900/30 text-green-200 border-green-900 text-xs rounded px-1 outline-none"><option value="">綠隊</option><option v-for="s in uniqueStaffList" :value="s">{{s}}</option></select>
+            <select v-model="compareList[3]" class="bg-blue-900/30 text-blue-200 border-blue-900 text-xs rounded px-1 outline-none"><option value="">藍隊</option><option v-for="s in uniqueStaffList" :value="s">{{s}}</option></select>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <button @click="uploadToFirebase" class="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded flex items-center gap-1 shadow-lg shadow-indigo-500/30 transition">
+                <i class="fa-solid fa-cloud-arrow-up"></i> 雲端暫存
             </button>
+            <div class="h-4 w-px bg-slate-700 mx-1"></div>
+            <button @click="downloadCSV" class="text-slate-400 hover:text-white" title="下載 CSV"><i class="fa-solid fa-download"></i></button>
+            <button @click="showInput = !showInput" class="text-slate-400 hover:text-white" title="編輯 CSV"><i class="fa-solid fa-pen-to-square"></i></button>
         </div>
     </header>
 
-    <div v-if="showInput" class="absolute top-12 right-0 w-96 bg-white border border-slate-200 shadow-2xl z-50 p-4 animate-fade-in rounded-bl-lg">
-        <div class="flex justify-between mb-2 items-center">
-            <h3 class="font-bold text-slate-700 text-sm">CSV 資料源</h3>
-            <button @click="processCSV" class="bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700 shadow"><i class="fa-solid fa-play"></i> 分析</button>
-        </div>
-        <textarea v-model="csvInput" class="w-full h-40 p-2 text-[10px] font-mono border rounded bg-slate-50 focus:ring-1 focus:ring-blue-500 mb-2" spellcheck="false"></textarea>
-        <div class="flex justify-between items-center border-t pt-2">
-            <span class="text-[10px] text-slate-400">支援貼上 Excel CSV 格式</span>
-            <button @click="uploadToFirebase" class="text-xs text-orange-600 hover:text-orange-700 font-bold flex items-center gap-1">
-                <i class="fa-solid fa-cloud-upload-alt"></i> 上傳雲端 (Firebase)
-            </button>
+    <div v-if="showInput" class="absolute inset-0 bg-slate-900/90 z-[60] flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-4xl rounded-lg shadow-2xl overflow-hidden flex flex-col h-[80vh]">
+            <div class="p-4 border-b flex justify-between items-center bg-slate-50">
+                <h3 class="font-bold text-slate-700">原始資料編輯</h3>
+                <div class="flex gap-2">
+                    <button @click="processCSV" class="bg-emerald-600 text-white px-4 py-1 rounded text-sm hover:bg-emerald-700">應用並分析</button>
+                    <button @click="showInput = false" class="text-slate-500 hover:text-red-500 px-2"><i class="fa-solid fa-times"></i></button>
+                </div>
+            </div>
+            <textarea v-model="csvInput" class="flex-grow p-4 font-mono text-xs focus:outline-none resize-none" spellcheck="false"></textarea>
         </div>
     </div>
 
-    <main class="flex-grow overflow-hidden relative flex flex-col bg-white">
-        
-        <div v-if="currentView === 'kanban'" class="flex-grow flex p-2 gap-2 bg-slate-100 overflow-hidden">
-            <div v-for="(drawer, index) in drawers" :key="drawer.key" class="flex-1 flex flex-col bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
-                <div class="p-2 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+    <main class="flex-grow p-4 overflow-hidden relative bg-slate-100">
+
+        <div v-if="currentView === 'kanban'" class="h-full flex gap-3 overflow-x-auto pb-2">
+            <div v-for="(drawer, index) in drawers" :key="drawer.key" class="kanban-col shadow-sm">
+                <div class="p-3 border-b bg-white flex justify-between items-center sticky top-0 z-10">
                     <div class="flex items-center gap-2">
-                        <div class="w-1.5 h-4 rounded-full" :class="drawer.colorBg"></div>
-                        <span class="font-bold text-sm text-slate-700">{{ drawer.name }}</span>
+                        <div class="w-1.5 h-6 rounded-full" :class="drawer.colorClass"></div>
+                        <span class="font-bold text-slate-700">{{ drawer.name }}區</span>
                     </div>
-                    <span class="text-[10px] font-mono text-slate-400">{{ getFilteredShiftCount(drawer.key) }} 場</span>
+                    <div class="text-[10px] text-slate-400 bg-slate-50 px-2 py-1 rounded border">
+                        {{ getDrawerShiftCount(drawer.key) }} 場
+                    </div>
                 </div>
                 
-                <div :ref="el => { if(el) drawerRefs[index] = el }" 
-                     @scroll="syncScroll(index)"
-                     class="drawer-body flex-grow overflow-y-auto custom-scroll p-1">
+                <div class="grid grid-cols-5 bg-slate-50 border-b text-[10px] text-slate-400 text-center py-1">
+                    <div>一</div><div>二</div><div>三</div><div>四</div><div>五</div>
+                </div>
+
+                <div class="overflow-y-auto custom-scrollbar flex-grow p-1 sync-scroll-target" 
+                     @scroll="handleSyncScroll($event)">
                     
-                    <div v-for="(week, wIndex) in getDrawerWeeks(drawer.key)" :key="wIndex" class="mb-1">
-                        <div v-if="week.monthLabel" class="sticky top-0 z-10 bg-white/90 backdrop-blur border-b border-slate-100 py-1 mb-1 text-[10px] font-bold text-slate-500 text-center shadow-sm">
+                    <div v-for="week in calendarWeeks" :key="week.id" class="mb-1">
+                        <div v-if="week.isMonthStart" class="text-[10px] font-bold text-slate-400 pl-1 mt-2 mb-1 border-l-2 border-emerald-400">
                             {{ week.monthLabel }}
                         </div>
-                        
+
                         <div class="grid grid-cols-5 gap-1">
                             <div v-for="day in week.days" :key="day.dateStr" 
-                                 class="min-h-[80px] border border-slate-100 rounded p-1 hover:bg-slate-50 transition"
-                                 :class="{'bg-slate-50/50': !day.isCurrentMonth}">
-                                <div class="text-[10px] text-slate-400 font-mono mb-1 text-center">{{ day.dayNum }}</div>
+                                 class="min-h-[80px] bg-white border border-slate-200 rounded p-1 hover:bg-slate-50 transition relative group">
                                 
-                                <div v-for="shift in day.shifts" :key="shift.id" 
-                                     class="text-[10px] px-1 py-0.5 mb-1 rounded border-l-2 bg-white shadow-sm truncate cursor-help"
+                                <div class="flex justify-between items-start mb-1">
+                                    <span class="text-[10px] font-mono" :class="day.isToday ? 'text-emerald-600 font-bold' : 'text-slate-300'">{{ day.dayNum }}</span>
+                                </div>
+
+                                <div v-for="shift in getShifts(day.dateStr, drawer.key)" :key="shift.id"
+                                     class="shift-card"
                                      :class="getComparisonColorClass(shift.staff)"
-                                     :title="shift.staff">
-                                    {{ shift.staff.slice(0,3) }} </div>
+                                     @click="editShiftCard(shift)"
+                                     :title="shift.staff + ' (' + shift.subStation + ')'">
+                                    {{ truncateName(shift.staff) }}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -171,72 +214,90 @@
             </div>
         </div>
 
-        <div v-if="currentView === 'matrix'" class="flex-grow flex flex-col overflow-hidden">
-            
-            <div class="flex-none h-12 border-b border-slate-200 bg-white flex items-center px-4 gap-4 overflow-x-auto custom-scroll">
-                <span class="text-xs font-bold text-slate-500 uppercase tracking-wider flex-none">
-                    <i class="fa-solid fa-chart-simple mr-1 text-blue-500"></i> 多廠商比較
-                </span>
-                
-                <div class="flex gap-2 flex-none">
-                    <div v-for="(color, idx) in ['red', 'yellow', 'green', 'blue']" :key="idx" class="relative group">
-                        <select v-model="compareList[idx]" 
-                                class="text-[10px] border border-slate-200 rounded pl-2 pr-6 py-1 appearance-none focus:outline-none focus:ring-1 cursor-pointer w-24 truncate font-bold"
-                                :class="{
-                                    'bg-red-50 text-red-700 border-red-200': idx===0,
-                                    'bg-yellow-50 text-yellow-700 border-yellow-200': idx===1,
-                                    'bg-green-50 text-green-700 border-green-200': idx===2,
-                                    'bg-blue-50 text-blue-700 border-blue-200': idx===3,
-                                    'text-slate-400': !compareList[idx]
-                                }">
-                            <option value="">選擇廠商...</option>
-                            <option v-for="s in uniqueStaffList" :value="s">{{s}}</option>
-                        </select>
-                        <div class="absolute right-2 top-1.5 pointer-events-none opacity-50"><i class="fa-solid fa-caret-down text-[10px]"></i></div>
+        <div v-if="currentView === 'matrix'" class="matrix-container custom-scrollbar">
+            <table class="matrix-table">
+                <thead>
+                    <tr>
+                        <th class="w-32 bg-slate-50">站名 \ 日期</th>
+                        <th v-for="header in matrixHeaders" :key="header.date" class="min-w-[40px]">
+                            <div class="font-bold text-slate-600">{{ header.simpleDate }}</div>
+                            <div class="text-[9px] font-normal text-slate-400">{{ header.dayName }}</div>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template v-for="(group, gIndex) in matrixGroups" :key="group.name">
+                        <tr v-for="(row, rIndex) in group.rows" :key="row.station" 
+                            :class="[gIndex % 2 === 0 ? 'station-group-bg-odd' : 'station-group-bg-even', rIndex === 0 && gIndex !== 0 ? 'station-divider' : '']">
+                            
+                            <td>
+                                <div class="flex items-center justify-between">
+                                    <span>{{ row.station }}</span>
+                                    <span v-if="rIndex === 0" class="text-[9px] px-1 rounded text-white font-bold" 
+                                          :class="group.badgeClass">{{ group.name }}</span>
+                                </div>
+                            </td>
+
+                            <td v-for="(cell, cIndex) in row.cells" :key="cIndex" 
+                                :class="getComparisonColorClass(cell)">
+                                {{ cell }}
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+
+        <div v-if="currentView === 'analysis'" class="bg-white rounded-lg shadow h-full overflow-hidden flex flex-col border border-slate-200">
+            <div class="p-4 border-b bg-slate-50">
+                <h3 class="font-bold text-slate-700">多廠商活躍度分析</h3>
+                <p class="text-xs text-slate-400 mt-1">分析選定廠商在各站點的分佈佔比 (雙連/士林/石牌)</p>
+            </div>
+            <div class="overflow-y-auto custom-scrollbar p-4">
+                <div v-if="activeComparison.length === 0" class="text-center py-20 text-slate-300">
+                    <i class="fa-solid fa-arrow-up mb-2"></i><br>請在上方的下拉選單選擇廠商進行 PK
+                </div>
+                <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div v-for="stat in analysisStats" :key="stat.name" class="border rounded-lg p-4 bg-white shadow-sm relative overflow-hidden">
+                        <div class="absolute top-0 left-0 w-1 h-full" :class="stat.colorClass"></div>
+                        <h4 class="font-bold text-lg mb-2 text-slate-800">{{ stat.name }}</h4>
                         
-                        <div v-if="compareList[idx]" class="absolute top-full left-0 mt-1 w-48 bg-slate-800 text-white text-[10px] p-2 rounded shadow-xl z-50 hidden group-hover:block">
-                            <div class="font-bold border-b border-slate-600 pb-1 mb-1">{{ compareList[idx] }} 分佈</div>
-                            <div v-for="(val, key) in getStaffDistribution(compareList[idx])" class="flex justify-between">
-                                <span>{{key}}</span> <span class="font-mono text-emerald-300">{{val}}%</span>
+                        <div class="flex justify-between items-end mb-4">
+                            <div>
+                                <div class="text-xs text-slate-400">總場次</div>
+                                <div class="text-2xl font-mono font-bold text-slate-700">{{ stat.totalCount }}</div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-xs text-slate-400">預估營收</div>
+                                <div class="text-lg font-mono font-bold text-emerald-600">${{ stat.revenue.toLocaleString() }}</div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-2">
+                            <div class="flex items-center text-xs">
+                                <span class="w-8 text-slate-500">雙連</span>
+                                <div class="flex-grow bg-slate-100 rounded-full h-2 mx-2 overflow-hidden">
+                                    <div class="h-full bg-blue-500" :style="{width: stat.dist.shuanglian + '%'}"></div>
+                                </div>
+                                <span class="w-8 text-right font-mono">{{ stat.dist.shuanglian }}%</span>
+                            </div>
+                            <div class="flex items-center text-xs">
+                                <span class="w-8 text-slate-500">士林</span>
+                                <div class="flex-grow bg-slate-100 rounded-full h-2 mx-2 overflow-hidden">
+                                    <div class="h-full bg-emerald-500" :style="{width: stat.dist.shilin + '%'}"></div>
+                                </div>
+                                <span class="w-8 text-right font-mono">{{ stat.dist.shilin }}%</span>
+                            </div>
+                            <div class="flex items-center text-xs">
+                                <span class="w-8 text-slate-500">石牌</span>
+                                <div class="flex-grow bg-slate-100 rounded-full h-2 mx-2 overflow-hidden">
+                                    <div class="h-full bg-amber-500" :style="{width: stat.dist.shipai + '%'}"></div>
+                                </div>
+                                <span class="w-8 text-right font-mono">{{ stat.dist.shipai }}%</span>
                             </div>
                         </div>
                     </div>
-                    
-                    <button @click="compareList=['','','','']" class="text-[10px] text-slate-400 hover:text-red-500 underline self-center">清除</button>
                 </div>
-            </div>
-
-            <div class="flex-grow overflow-auto custom-scroll relative bg-white">
-                <table class="matrix-table">
-                    <thead class="text-[10px] text-slate-500 font-bold uppercase">
-                        <tr>
-                            <th class="px-4 py-2 bg-slate-50/90 backdrop-blur text-left min-w-[100px]">
-                                站名 \ 日期
-                            </th>
-                            <th v-for="h in matrixData.headers" :key="h.date" 
-                                class="px-1 py-1 bg-slate-50/90 backdrop-blur min-w-[40px]"
-                                :class="{'month-border-left': h.isMonthStart}">
-                                <div class="font-mono text-slate-700">{{ h.shortDate }}</div>
-                                <div class="font-light text-slate-400 scale-90">{{ h.dayOfWeek }}</div>
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody class="text-[10px] text-slate-600 font-mono">
-                        <tr v-for="row in matrixData.rows" :key="row.station" class="hover:bg-slate-50 transition group">
-                            <td class="px-2 font-bold text-slate-700 bg-slate-50 group-hover:bg-slate-100">
-                                {{ row.station }}
-                            </td>
-                            <td v-for="(cell, i) in row.cells" :key="i"
-                                class="hover:bg-slate-100 cursor-default"
-                                :class="[getMatrixCellClass(cell), {'month-border-left': matrixData.headers[i].isMonthStart}]"
-                                :title="cell">
-                                <span v-if="cell" class="truncate block max-w-[60px] mx-auto">
-                                    {{ cell }}
-                                </span>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
             </div>
         </div>
 
@@ -244,65 +305,50 @@
 </div>
 
 <script>
-    const { createApp, ref, computed, onMounted, watch } = Vue;
+    const { createApp, ref, computed, onMounted, nextTick } = Vue;
 
-    // 您的資料 (為了節省空間，這裡使用縮減版，實際運作請貼入完整資料)
-    const defaultCSV = `站名 / 日期,11/3（一）,11/04（二）,11/05（三）,11/06（四）,11/07（五）,12/01（一）,12/02（二）,01/01（四）,02/02（一）,02/03（二）
-雙連一,御品園放牧雞蛋,輝鴻有機農場,花蓮晴盛蜂場,樂穠,饅實在小舖,瑞田有機農場,DIVA の吃貨棧,阿財綠竹農場,瑞田農場,文獻農場
-雙連二,清淨母語,永昇甘蔗,御品園放牧雞蛋,,樂穠,饅實在小舖,雅芯香草園,御品園放牧雞蛋,御品園放牧雞蛋,晴盛養蜂場
-士林一,饅實在小舖,花蓮晴盛蜂場,饅實在小舖,力凡「米」烘焙,御品園放牧雞蛋,松滿緣有機農場,瑞田農場,部落e購,松滿緣有機農場,瑞田農場
-石牌一,輝要有機菜園,修賢養蜂場,Wholesome 好•好酸麵包,DIVA の吃貨棧,川桑果園,饅實在小舖,雅芯香草園,古乙伯苦茶油,饅實在小舖,雅芯香草園`;
+    // 您的資料 (v7.0 相同，此處略縮以節省空間，請替換為完整 CSV string)
+    const defaultCSV = `站名 / 日期,11/3（一）,11/04（二）,11/05（三）,11/06（四）,11/07（五）,11/10（一）,11/11（二）,11/12（三）,11/13（四）,11/14（五）,11/17（一）,11/18（二）,11/19（三）,11/20（四）,11/21（五）,11/24（一）,11/25（二）,11/26（三）,11/27（四）,11/28（五）,12/01（一）,12/02（二）,12/03（三）,12/04（四）,12/05（五）,12/08（一）,12/09（二）,12/10（三）,12/11（四）,12/12（五）,12/15（一）,12/16（二）,12/17（三）,12/18（四）,12/19（五）,12/22（一）,12/23 （二）,12/24（三）,12/25（四）,12/26（五）,12/29（一）,12/30（二）,12/31（三）,01/01（四）,01/02（五）,01/05（一）,01/06（二）,01/07（三）,01/08（四）,01/09（五）,01/12（一）,01/13（二）,01/14（三）,01/15（四）,01/16（五）,01/19（一）,01/20（二）,01/21（三）,01/22（四）,01/23（五）,01/26（一）,01/27（二）,01/28（三）,01/29（四）,01/30（五）,02/02（一）,02/03（二）,02/04（三）,02/05（四）,02/06（五）,02/09（一）,02/10（二）,02/11（三）,02/12（四）,02/13（五）,02/23（一）,02/24（二）,02/25（三）,02/26（四）,02/27（五）,03/02（一）,03/03（二）,03/04（三）,03/05（四）,03/06（五）,03/09（一）,03/10（二）,03/11（三）,03/12（四）,03/13（五）,03/16（一）,03/17（二）,03/18（三）,03/19（四）,03/20（五）,03/23（一）,03/24（二）,03/25（三）,03/26（四）,03/27（五）,03/30（一）,03/31（二）,04/01（三）,04/02（四）,04/03（五）,04/06（一）,04/07（二）,04/08（三）,04/09（四）,04/10（五）,04/13（一）,04/14（二）,04/15（三）,04/16（四）,04/17（五）,04/20（一）,04/21（二）,04/22（三）,04/23（四）,04/24（五）,04/27（一）,04/28（二）,04/29（三）,04/30（四）
+雙連一,御品園放牧雞蛋,輝鴻有機農場,花蓮晴盛蜂場,樂穠,饅實在小舖,御品園放牧雞蛋,DIVA の吃貨棧,輝要有機菜園,樂穠,樂穠,御品園放牧雞蛋,輝鴻有機農場,修賢養蜂場,樂穠,川桑果園,瑞田有機農場,DIVA の吃貨棧,修賢養蜂場,瑞田有機農場,饅實在小舖,瑞田有機農場,雅芯香草園,修賢養蜂場,瑞田有機農場,川桑果園,御品園放牧雞蛋,DIVA の吃貨棧,修賢養蜂場,樂穠,川桑果園,御品園放牧雞蛋,永昇甘蔗,修賢養蜂場,樂穠,川桑果園,御品園放牧雞蛋,DIVA の吃貨棧,修賢養蜂場,樂穠,川桑果園,瑞田有機農場,永昇甘蔗,修賢養蜂場,松滿緣有機農場,川桑果園,御品園放牧雞蛋,永昇甘蔗,御品園放牧雞蛋,瑞田有機農場,川桑果園,御品園放牧雞蛋,DIVA の吃貨棧,御品園放牧雞蛋,樂穠,川桑果園,御品園放牧雞蛋,永昇甘蔗,御品園放牧雞蛋,瑞田有機農場,樂穠,御品園放牧雞蛋,DIVA の吃貨棧,御品園放牧雞蛋,樂穠,樂穠,瑞田農場,文獻農場,川桑果園,瑞田農場,樂穠,瑞田農場,雅芯香草園,輝要有機菜園,樂穠,川桑果園,雅芯香草園,阿財綠竹農場,雅芯香草園,樂穠,川桑果園,瑞田農場,文獻農場,輝要有機菜園,樂穠,饅實在小舖,瑞田農場,DIVA の 吃貨棧,阿財綠竹農場,樂穠,樂穠,瑞田農場,雅芯香草園,301farm農場,雅芯香草園,饅實在小舖,瑞田農場,,阿財綠竹農場,樂穠,川桑果園,瑞田農場,文獻農場,輝要有機菜園,樂穠,饅實在小舖,瑞田農場,阿財綠竹農場,阿財綠竹農場,樂穠,饅實在小舖,瑞田農場,雅芯香草園,,雅芯香草園,饅實在小舖,瑞田農場,輝鴻有機農場,阿財綠竹農場,樂穠,饅實在小舖,瑞田農場,DIVA の 吃貨棧,阿財綠竹農場,樂穠
+雙連二,清淨母語,永昇甘蔗,御品園放牧雞蛋,,樂穠,饅實在小舖,雅芯香草園,御品園放牧雞蛋,瑞田有機農場,部落e購,饅實在小舖,松滿緣有機農場,301farm農場,瑞田有機農場,饅實在小舖,御品園放牧雞蛋,輝鴻有機農場,御品園放牧雞蛋,樂穠,樂穠,御品園放牧雞蛋,永昇甘蔗,御品園放牧雞蛋,樂穠,樂穠,饅實在小舖,永昇甘蔗,御品園放牧雞蛋,瑞田有機農場,饅實在小舖,瑞田有機農場,文獻農場,御品園放牧雞蛋,瑞田有機農場,饅實在小舖,饅實在小舖,雅芯香草園,301farm農場,雅芯香草園,饅實在小舖,御品園放牧雞蛋,,御品園放牧雞蛋,,,瑞田有機農場,,輝要有機菜園,樂穠,樂穠,瑞田有機農場,雅芯香草園,輝要有機菜園,瑞田有機農場,樂穠,瑞田有機農場,,輝要有機菜園,樂穠,部落e購,瑞田有機農場,永昇甘蔗,輝要有機菜園,瑞田有機農場,部落e購,御品園放牧雞蛋,晴盛養蜂場,輝要有機菜園,樂穠,,文獻農場,輝鴻有機農場,御品園放牧雞蛋,瑞田農場,樂穠,瑞田農場,,輝要有機菜園,瑞田農場,饅實在小舖,御品園放牧雞蛋,,御品園放牧雞蛋,瑞田農場,樂穠,,,輝要有機菜園,瑞田農場,饅實在小舖,御品園放牧雞蛋,文獻農場,松滿緣有機農場,樂穠,樂穠,清淨母語,輝鴻有機農場,輝要有機菜園,瑞田農場,饅實在小舖,御品園放牧雞蛋,DIVA の 吃貨棧,御品園放牧雞蛋,瑞田農場,樂穠,清淨母語,輝鴻有機農場,輝要有機菜園,瑞田農場,樂穠,御品園放牧雞蛋,,輝要有機菜園,樂穠,樂穠,清淨母語,永昇甘蔗,輝要有機菜園,瑞田農場,樂穠,御品園放牧雞蛋,輝鴻有機農場,輝要有機菜園,瑞田農場
+雙連三,修賢養蜂場,,輝要有機菜園,,部落e購,,輝鴻有機農場,修賢養蜂場,雅芯香草園,,瑞田有機農場,永昇甘蔗,五寮尖山羊乳,雅芯香草園,樂穠,,文獻農場,輝要有機菜園,阿財綠竹農場,花蓮晴盛蜂場,饅實在小舖,,輝要有機菜園,雅芯香草園,,瑞田有機農場,,輝要有機菜園,,樂穠,,,輝要有機菜園,,樂穠,瑞田有機農場,永昇甘蔗,御品園放牧雞蛋,,樂穠,清淨母語,,輝要有機菜園,,,,,,,,,松滿緣有機農場,,雅芯香草園,,,,五寮尖山羊乳,,,清淨母語,,,松滿緣有機農場,,清淨母語,永昇甘蔗,御品園放牧雞蛋,,,御品園放牧雞蛋,永昇甘蔗,,,,御品園放牧雞蛋,,御品園放牧雞蛋,,樂穠,,輝鴻有機農場,饅實在小舖,,川桑果園,御品園放牧雞蛋,輝鴻有機農場,御品園放牧雞蛋,日心農場,川桑果園,,,輝要有機菜園,瑞田農場,川桑果園,御品園放牧雞蛋,永昇甘蔗,御品園放牧雞蛋,吉米農場,樂穠,,輝鴻有機農場,饅實在小舖,吉米農場,,御品園放牧雞蛋,永昇甘蔗,御品園放牧雞蛋,,,,DIVA の 吃貨棧,御品園放牧雞蛋,瑞田農場,,御品園放牧雞蛋,,御品園放牧雞蛋,,,,永昇甘蔗,御品園放牧雞蛋,
+雙連四,,,,,御品園放牧雞蛋,,永昇甘蔗,文獻農場,阿財綠竹農場,,清淨母語,,輝要有機菜園,,阿財綠竹農場,,永昇甘蔗,,,川桑果園,清淨母語,,,,,,,,,松滿緣有機農場,,,文獻農場,,,,,輝要有機菜園,,,,,,,,,,,,,,永昇甘蔗,,,,,,,,,,,,,,小潘農場,輝鴻有機農場,,,,,,,,,,,,,,,永昇甘蔗,,,,,永昇甘蔗,小潘農場,,,,輝鴻有機農場,御品園放牧雞蛋,,,,,,,,,永昇甘蔗,,清淨母語,,,,,,,,輝鴻有機農場,,,,,,,,,,,小潘農場,
+雙連五,,,,,,,,,,,,,御品園放牧雞蛋,,,,,,,,,,,,,,,,,,,,五寮尖山羊乳,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,永昇甘蔗,,,,,,,,,,,301farm農場,,,,,,,,,永昇甘蔗,,,,,,,,,,,,
+士林一,饅實在小舖,花蓮晴盛蜂場,饅實在小舖,力凡「米」烘焙,御品園放牧雞蛋,松滿緣有機農場,文獻農場,饅實在小舖,人山艸,御品園放牧雞蛋,瑞田有機農場,雅芯香草園,饅實在小舖,力凡「米」烘焙,御品園放牧雞蛋,瑞田有機農場,,饅實在小舖,花蓮晴盛蜂場,御品園放牧雞蛋,瑞田有機農場,,饅實在小舖,人山艸,御品園放牧雞蛋,瑞田有機農場,雅芯香草園,饅實在小舖,雅芯香草園,,饅實在小舖,,饅實在小舖,力凡「米」烘焙,美好の食物,瑞田有機農場,,力凡「米」烘焙,吉米農場,御品園放牧雞蛋,瑞田有機農場,雅芯香草園,饅實在小舖,雅芯香草園,御品園放牧雞蛋,瑞田有機農場,,301farm農場,力凡「米」烘焙,御品園放牧雞蛋,瑞田有機農場,,部落e購,,御品園放牧雞蛋,瑞田有機農場,雅芯香草園,部落e購,力凡「米」烘焙,御品園放牧雞蛋,瑞田有機農場,,部落e購,,御品園放牧雞蛋,松滿緣有機農場,瑞田農場,部落e購,,御品園放牧雞蛋,瑞田農場,瑞田農場,部落e購,清淨母語,御品園放牧雞蛋,瑞田農場,瑞田農場,部落e購,力凡「米」烘焙,御品園放牧雞蛋,清淨母語,瑞田農場,部落e購,,御品園放牧雞蛋,瑞田農場,瑞田農場,部落e購,力凡「米」烘焙,松滿緣有機農場,瑞田農場,瑞田農場,部落e購,阿財綠竹農場,御品園放牧雞蛋,瑞田農場,雅芯香草園,部落e購,雅芯香草園,御品園放牧雞蛋,瑞田農場,瑞田農場,人山艸,部落e購,御品園放牧雞蛋,瑞田農場,瑞田農場,部落e購,阿財綠竹農場,御品園放牧雞蛋,瑞田農場,瑞田農場,部落e購,阿財綠竹農場,五寮尖山羊乳,文獻農場,雅芯香草園,部落e購,雅芯香草園,御品園放牧雞蛋,瑞田農場,瑞田農場,部落e購,阿財綠竹農場
+士林二,,,阿財綠竹農場,人山艸,五寮尖山羊乳,清淨母語,修賢養蜂場,阿財綠竹農場,吉米農場,五寮尖山羊乳,,,阿財綠竹農場,花蓮晴盛蜂場,松滿緣有機農場,清淨母語,,文獻農場,人山艸,川桑果園,清淨母語,,部落e購,,安工坊烘焙,松滿緣有機農場,,清淨母語,吉米農場,御品園放牧雞蛋,瑞田有機農場,,清淨母語,DIVA の吃貨棧,御品園放牧雞蛋,,,饅實在小舖,,清淨母語,饅實在小舖,,文獻農場,,,,,部落e購,人山艸,五寮尖山羊乳,松滿緣有機農場,,,人山艸,部落e購,,,,雅芯香草園,,,,,人山艸,,瑞田農場,,點點綠-饅實在,,,清淨母語,點點綠-呷米,吉米農場,人山艸,部落e購,點點綠-呷米,洛小果農場,點點綠-饅實在,五寮尖山羊乳,川桑果園,瑞田農場,川桑果園,,吉米農場,川桑果園,清淨母語,點點綠-點點綠-呷米,點點綠-饅實在,阿財綠竹農場,御品園放牧雞蛋,清淨母語,點點綠-呷米,點點綠-饅實在,吉米農場,川桑果園,,瑞田農場,點點綠-饅實在,力凡「米」烘焙,清淨母語,饅實在小舖,,力凡「米」烘焙,阿財綠竹農場,,,,點點綠-饅實在,人山艸,五寮尖山羊乳,清淨母語,松滿緣有機農場,點點綠-饅實在,吉米農場,御品園放牧雞蛋,瑞田農場,瑞田農場,點點綠-饅實在,力凡「米」烘焙,,清淨母語,點點綠-呷米,點點綠-饅實在,松滿緣有機農場
+士林三,,,部落e購,,,,,部落e購,,,,,清淨母語,人山艸,部落e購,,,部落e購,吉米農場,五寮尖山羊乳,,,,,五寮尖山羊乳,,,部落e購,,,清淨母語,,部落e購,,松滿緣有機農場,,,松滿緣有機農場,,,,,,,,,,,部落e購,,清淨母語,,,,,,,,人山艸,,,,,,,清淨母語,,文獻農場,,,,,點點綠-饅實在,,松滿緣有機農場,,人山艸,松滿緣有機農場,人山艸,點點綠-呷米,,阿財綠竹農場,文獻農場,松滿緣有機農場,點點綠-呷米,,阿財綠竹農場,,人山艸,川桑果園,,阿財綠竹農場,文獻農場,人山艸,,,阿財綠竹農場,,阿財綠竹農場,,,,點點綠-饅實在,DIVA の 吃貨棧,,,,,部落e購,,,,,人山艸,,,,,阿財綠竹農場,,,,,人山艸
+士林四,,,,,,,,清淨母語,,,,,部落e購,部落e購,五寮尖山羊乳,,,清淨母語,,,,,,,,,,,,,,,,,五寮尖山羊乳,,,部落e購,,,,,,,,,,,,,,,,,,,,,,,,,,,,日盛聯合,,,,,,,點點綠-呷米,,點點綠-呷米,,,洛小果農場,部落e購,,,,點點綠-饅實在,人山艸,,,,,部落e購,點點綠-呷米,,,,,,,,,人山艸,,,,文獻農場,松滿緣有機農場,,,,,DIVA の 吃貨棧,,,,,,,,,,人山艸,,,,,清淨母語
+石牌一,輝要有機菜園,修賢養蜂場,Wholesome 好•好酸麵包,DIVA の吃貨棧,川桑果園,牧蜂農莊,阿財綠竹農場,Wholesome 好•好酸麵包,瑞田有機農場,川桑果園,輝要有機菜園,修賢養蜂場,小潘農場,瑞田有機農場,川桑果園,輝要有機菜園,修賢養蜂場,Wholesome 好•好酸麵包,雅芯香草園,Two2Way 呷米,牧蜂農莊,修賢養蜂場,Wholesome 好•好酸麵包,DIVA の吃貨棧,川桑果園,輝要有機菜園,修賢養蜂場,Wholesome 好•好酸麵包,瑞田有機農場,安工坊烘焙,牧蜂農莊,修賢養蜂場,Wholesome 好•好酸麵包,部落e購,Two2Way 呷米,牧蜂農莊,修賢養蜂場,小潘農場,瑞田有機農場,川桑果園,牧蜂農莊,修賢養蜂場,301farm農場,瑞田有機農場,川桑果園,輝要有機菜園,雅芯香草園,Wholesome 好•好酸麵包,,川桑果園,輝要有機菜園,人山艸,Wholesome 好•好酸麵包,瑞田有機農場,川桑果園,輝要有機菜園,人山艸,Wholesome 好•好酸麵包,,御品園放牧雞蛋,輝要有機菜園,雅芯香草園,Wholesome 好•好酸麵包,瑞田有機農場,御品園放牧雞蛋,饅實在小舖,雅芯香草園,古乙伯苦茶油,雅芯香草園,點點綠-呷米,清淨母語,DIVA の 吃貨棧,古乙伯苦茶油,雅芯香草園,五寮尖山羊乳,饅實在小舖,點點綠-呷米,Wholesome 好•好酸麵包,松滿緣有機農場,御品園放牧雞蛋,饅實在小舖,雅芯香草園,古乙伯苦茶油,雅芯香草園,松滿緣有機農場,饅實在小舖,雅芯香草園,古乙伯苦茶油,雅芯香草園,五寮尖山羊乳,饅實在小舖,人山艸,古乙伯苦茶油,部落e購,點點綠-呷米,力凡「米」烘焙,點點綠-呷米,古乙伯苦茶油,部落e購,點點綠-呷米,松滿緣有機農場,雅芯香草園,古乙伯苦茶油,雅芯香草園,點點綠-呷米,饅實在小舖,雅芯香草園,古乙伯苦茶油,雅芯香草園,點點綠-呷米,饅實在小舖,點點綠-呷米,Wholesome 好•好酸麵包,部落e購,點點綠-呷米,力凡「米」烘焙,點點綠-呷米,古乙伯苦茶油,部落e購,點點綠-呷米,饅實在小舖,雅芯香草園,古乙伯苦茶油,雅芯香草園
+石牌二,花蓮晴盛蜂場,雅芯香草園,301farm農場,雅芯香草園,美好の食物,輝要有機菜園,Two2Way 呷米,301farm農場,松滿緣有機農場,御品園放牧雞蛋,,阿財綠竹農場,力凡「米」烘焙,美好の食物,花蓮晴盛蜂場,雅芯香草園,阿財綠竹農場,301farm農場,瑞田有機農場,御品園放牧雞蛋,輝要有機菜園,人山艸,301farm農場,瑞田有機農場,御品園放牧雞蛋,清淨母語,Two2Way 呷米,301farm農場,松滿緣有機農場,御品園放牧雞蛋,輝要有機菜園,雅芯香草園,力凡「米」烘焙,瑞田有機農場,安工坊烘焙,力凡「米」烘焙,松滿緣有機農場,古乙伯苦茶油,,御品園放牧雞蛋,輝要有機菜園,人山艸,松滿緣有機農場,吉米農場,御品園放牧雞蛋,松滿緣有機農場,人山艸,小潘農場,DIVA の吃貨棧,御品園放牧雞蛋,小潘農場,,小潘農場,吉米農場,御品園放牧雞蛋,,,力凡「米」烘焙,瑞田有機農場,安工坊烘焙,,人山艸,301farm農場,雅芯香草園,五寮尖山羊乳,晴盛養蜂場,點點綠-呷米,Wholesome 好•好酸麵包,部落e購,安工坊烘焙,輝要有機菜園,日盛聯合,Wholesome 好•好酸麵包,部落e購,安工坊烘焙,輝要有機菜園,川桑果園,力凡「米」烘焙,瑞田農場,安工坊烘焙,文獻農場,點點綠-呷米,Wholesome 好•好酸麵包,部落e購,御品園放牧雞蛋,輝要有機菜園,人山艸,Wholesome 好•好酸麵包,DIVA の 吃貨棧,安工坊烘焙,文獻農場,川桑果園,Wholesome 好•好酸麵包,瑞田農場,安工坊烘焙,饅實在小舖,川桑果園,Wholesome 好•好酸麵包,瑞田農場,安工坊烘焙,清淨母語,點點綠-呷米,Wholesome 好•好酸麵包,力凡「米」烘焙,安工坊烘焙,輝要有機菜園,點點綠-呷米,Wholesome 好•好酸麵包,日心農場,安工坊烘焙,清淨母語,瑞田農場,蓋兒手釀,瑞田農場,安工坊烘焙,饅實在小舖,瑞田農場,Wholesome 好•好酸麵包,瑞田農場,安工坊烘焙,松滿緣有機農場,人山艸,Wholesome 好•好酸麵包,部落e購
+石牌三,清淨母語,阿財綠竹農場,,吉米農場,Two2Way 呷米,文獻農場,,古乙伯苦茶油,部落e購,安工坊烘焙,,人山艸,,DIVA の吃貨棧,安工坊烘焙,牧蜂農莊,人山艸,花蓮晴盛蜂場,部落e購,安工坊烘焙,,Two2Way 呷米,清淨母語,吉米農場,美好の食物,,,古乙伯苦茶油,部落e購,川桑果園,清淨母語,人山艸,小潘農場,雅芯香草園,御品園放牧雞蛋,輝要有機菜園,Two2Way 呷米,,,Two2Way 呷米,清淨母語,Two2Way 呷米,小潘農場,,部落e購,,,力凡「米」烘焙,雅芯香草園,安工坊烘焙,,,五寮尖山羊乳,部落e購,安工坊烘焙,,,古乙伯苦茶油,部落e購,,,,松滿緣有機農場,部落e購,,文獻農場,川桑果園,301farm農場,瑞田農場,部落e購,饅實在小舖,川桑果園,小潘農場,瑞田農場,輝要有機菜園,,瑞田農場,小潘農場,清淨母語,部落e購,輝要有機菜園,人山艸,五寮尖山羊乳,瑞田農場,301farm農場,清淨母語,川桑果園,力凡「米」烘焙,瑞田農場,部落e購,輝要有機菜園,瑞田農場,清淨母語,日心農場,部落e購,輝要有機菜園,瑞田農場,301farm農場,DIVA の 吃貨棧,部落e購,輝要有機菜園,瑞田農場,小潘農場,瑞田農場,部落e購,清淨母語,瑞田農場,301farm農場,瑞田農場,部落e購,輝要有機菜園,阿財綠竹農場,小潘農場,蓋兒手釀,部落e購,輝要有機菜園,阿財綠竹農場,301farm農場,日心農場,部落e購,輝要有機菜園,瑞田農場,301farm農場,瑞田農場
+石牌四,,人山艸,力凡「米」烘焙,部落e購,安工坊烘焙,,人山艸,清淨母語,文獻農場,Two2Way 呷米,,Two2Way 呷米,,吉米農場,Two2Way 呷米,清淨母語,Two2Way 呷米,古乙伯苦茶油,,,,,五寮尖山羊乳,部落e購,Two2Way 呷米,,,小潘農場,,Two2Way 呷米,,Two2Way 呷米,,吉米農場,川桑果園,清淨母語,,,,部落e購,,文獻農場,,,,,,古乙伯苦茶油,瑞田有機農場,部落e購,,,,,松滿緣有機農場,,,小潘農場,,,,,小潘農場,,,輝要有機菜園,瑞田農場,清淨母語,吉米農場,小潘農場,日盛聯合,瑞田農場,蓋兒手釀,蓋兒手釀,御品園放牧雞蛋,日盛聯合,五寮尖山羊乳,五寮尖山羊乳,吉米農場,五寮尖山羊乳,日盛聯合,瑞田農場,小潘農場,清淨母語,部落e購,日盛聯合,瑞田農場,301farm農場,吉米農場,御品園放牧雞蛋,日盛聯合,松滿緣有機農場,小潘農場,DIVA の 吃貨棧,川桑果園,日盛聯合,人山艸,小潘農場,日心農場,五寮尖山羊乳,日盛聯合,阿財綠竹農場,部落e購,日心農場,松滿緣有機農場,日盛聯合,人山艸,小潘農場,吉米農場,松滿緣有機農場,日盛聯合,人山艸,松滿緣有機農場,301farm農場,清淨母語,日盛聯合,人山艸,小潘農場,DIVA の 吃貨棧,五寮尖山羊乳,日盛聯合,阿財綠竹農場,清淨母語,日心農場`;
 
     createApp({
         setup() {
             const csvInput = ref(defaultCSV);
             const showInput = ref(false);
-            const currentView = ref('matrix'); // 預設為總表
-            const dateFilter = ref('all');
-            const targetStaff = ref('五寮尖山羊乳');
-            const compareList = ref(['', '', '', '']); // 四色比較
+            const currentView = ref('kanban'); 
+            const compareList = ref(['', '', '', '']); 
             const schedules = ref([]);
-            
-            // 抽屜 Refs 用於同步滾動
-            const drawerRefs = ref([]);
-            const isSyncing = ref(false);
 
             const drawers = [
-                { key: '雙連', name: '雙連', colorBg: 'bg-blue-500' },
-                { key: '士林', name: '士林', colorBg: 'bg-emerald-500' },
-                { key: '石牌', name: '石牌', colorBg: 'bg-amber-500' }
+                { key: '雙連', name: '雙連', colorClass: 'bg-blue-500' },
+                { key: '士林', name: '士林', colorClass: 'bg-emerald-500' },
+                { key: '石牌', name: '石牌', colorClass: 'bg-amber-500' }
             ];
 
-            // --- 核心邏輯 ---
-            
-            // 1. 同步滾動
-            const syncScroll = (sourceIndex) => {
-                if (isSyncing.value) return;
-                isSyncing.value = true;
-                
-                const scrollTop = drawerRefs.value[sourceIndex].scrollTop;
-                drawerRefs.value.forEach((el, idx) => {
-                    if (idx !== sourceIndex && el) {
-                        el.scrollTop = scrollTop;
-                    }
-                });
-                
-                // 簡單的防抖動
-                setTimeout(() => isSyncing.value = false, 50);
-            };
-
-            // 2. CSV 解析
             const processCSV = () => {
+                const results = [];
                 const parsed = Papa.parse(csvInput.value, { header: false, skipEmptyLines: true });
                 const rows = parsed.data;
-                const results = [];
                 const colMap = {};
 
                 if (rows.length < 2) return;
 
-                // 處理日期: 11/3（一） -> 2025-11-03
+                // 日期解析邏輯
                 rows[0].forEach((cell, idx) => {
                     if (idx === 0) return;
+                    // regex 抓取 11/3 or 11/03
                     const match = cell.match(/(\d{1,2})\/(\d{1,2})/);
                     if (match) {
                         const m = parseInt(match[1]);
@@ -325,7 +371,8 @@
                     row.forEach((cell, idx) => {
                         if (idx === 0) return;
                         const date = colMap[idx];
-                        if (date && cell) {
+                        if (date && cell && cell.trim()) {
+                            // 處理多個廠商用逗號分隔
                             const staffs = cell.split(/[,，、]/).map(s => s.trim()).filter(s => s);
                             staffs.forEach(s => {
                                 results.push({
@@ -333,6 +380,7 @@
                                     date,
                                     drawer: drawerKey,
                                     station: stationRaw,
+                                    subStation: stationRaw.replace(drawerKey, ''),
                                     staff: s
                                 });
                             });
@@ -343,62 +391,148 @@
                 showInput.value = false;
             };
 
-            // 3. 過濾器
-            const filteredSchedules = computed(() => {
-                return schedules.value.filter(s => {
-                    const m = parseInt(s.date.split('-')[1]);
-                    if (dateFilter.value === 'p1') return [11, 12, 1].includes(m);
-                    if (dateFilter.value === 'p2') return [2, 3, 4].includes(m);
-                    return true;
-                });
-            });
-
-            // 4. Matrix Data Structure (Reference Style)
-            const matrixData = computed(() => {
-                const dates = [...new Set(filteredSchedules.value.map(s => s.date))].sort();
-                
-                // Headers 處理
-                let lastMonth = -1;
-                const headers = dates.map(d => {
-                    const dateObj = new Date(d);
-                    const m = dateObj.getMonth() + 1;
-                    const dayName = ['(日)','(一)','(二)','(三)','(四)','(五)','(六)'][dateObj.getDay()];
-                    const isMonthStart = m !== lastMonth;
-                    if (isMonthStart) lastMonth = m;
-
-                    return {
-                        date: d,
-                        shortDate: `${m}/${dateObj.getDate()}`, // 11/3
-                        dayOfWeek: dayName, // (一)
-                        isMonthStart
-                    };
-                });
-
-                // Rows 處理
-                const stations = [...new Set(filteredSchedules.value.map(s => s.station))].sort();
-                const rows = stations.map(st => {
-                    const cells = dates.map(d => {
-                        const match = schedules.value.find(s => s.date === d && s.station === st);
-                        return match ? match.staff : '';
-                    });
-                    return { station: st, cells };
-                });
-
-                return { headers, rows };
-            });
-
-            // --- 樣式輔助 ---
+            // 輔助工具
+            const uniqueStaffList = computed(() => [...new Set(schedules.value.map(s => s.staff))].sort());
             
-            const getComparisonColorClass = (staffName) => {
-                const idx = compareList.value.indexOf(staffName);
-                if (idx === 0) return 'border-l-[3px] border-red-400 bg-red-50 text-red-900 font-bold';
-                if (idx === 1) return 'border-l-[3px] border-yellow-400 bg-yellow-50 text-yellow-900 font-bold';
-                if (idx === 2) return 'border-l-[3px] border-green-500 bg-green-50 text-green-900 font-bold';
-                if (idx === 3) return 'border-l-[3px] border-blue-500 bg-blue-50 text-blue-900 font-bold';
-                return 'border-l-[3px] border-slate-300 text-slate-600 bg-white';
+            // 截斷名稱 (3字)
+            const truncateName = (name) => {
+                return name.length > 3 ? name.substring(0, 3) + '..' : name;
             };
 
-            const getMatrixCellClass = (staffName) => {
+            // 同步滾動邏輯
+            const handleSyncScroll = (evt) => {
+                const scrollTop = evt.target.scrollTop;
+                // 找到所有 .sync-scroll-target (包含觸發者自己，沒關係)
+                const targets = document.querySelectorAll('.sync-scroll-target');
+                targets.forEach(el => {
+                    // 避免無窮迴圈觸發，這裡簡單直接設值
+                    if (Math.abs(el.scrollTop - scrollTop) > 5) {
+                        el.scrollTop = scrollTop;
+                    }
+                });
+            };
+
+            // [Kanban] 產生週曆
+            const calendarWeeks = computed(() => {
+                const dates = [...new Set(schedules.value.map(s => s.date))].sort();
+                if (dates.length === 0) return [];
+                const start = new Date(dates[0]);
+                const end = new Date(dates[dates.length-1]);
+                start.setDate(start.getDate() - (start.getDay() === 0 ? 6 : start.getDay() - 1)); // 設為週一
+
+                const weeks = [];
+                let curr = new Date(start);
+                let lastMonth = -1;
+
+                while (curr <= end) {
+                    const days = [];
+                    let monthLabel = '';
+                    let isMonthStart = false;
+
+                    for (let i = 0; i < 5; i++) {
+                        const dStr = curr.toISOString().slice(0, 10);
+                        const m = curr.getMonth() + 1;
+                        if (m !== lastMonth && i === 0) {
+                            monthLabel = `${curr.getFullYear()}年 ${m}月`;
+                            isMonthStart = true;
+                            lastMonth = m;
+                        }
+                        
+                        // Check Today (Mock: 假設今天是資料第一天)
+                        const isToday = dStr === dates[0]; 
+
+                        days.push({
+                            dateStr: dStr,
+                            dayNum: curr.getDate(),
+                            isToday
+                        });
+                        curr.setDate(curr.getDate() + 1);
+                    }
+                    weeks.push({ id: weeks.length, monthLabel, isMonthStart, days });
+                    curr.setDate(curr.getDate() + 2); // skip Sat/Sun
+                }
+                return weeks;
+            });
+
+            const getShifts = (date, drawer) => schedules.value.filter(s => s.date === date && s.drawer === drawer);
+            const getDrawerShiftCount = (drawer) => schedules.value.filter(s => s.drawer === drawer).length;
+
+            // [Matrix] 產生總表數據
+            const matrixHeaders = computed(() => {
+                const dates = [...new Set(schedules.value.map(s => s.date))].sort();
+                return dates.map(d => {
+                    const dayName = ['日','一','二','三','四','五','六'][new Date(d).getDay()];
+                    // 簡化: 11/03 (一)
+                    const m = d.split('-')[1];
+                    const dd = d.split('-')[2];
+                    return { date: d, simpleDate: `${parseInt(m)}/${dd}`, dayName: `(${dayName})` };
+                });
+            });
+
+            const matrixGroups = computed(() => {
+                const groups = [];
+                const allStations = [...new Set(schedules.value.map(s => s.station))].sort();
+                // 依雙連/士林/石牌分組
+                const stationOrder = ['雙連', '士林', '石牌'];
+                
+                stationOrder.forEach(key => {
+                    const myStations = allStations.filter(s => s.includes(key));
+                    const rows = myStations.map(st => {
+                        const cells = matrixHeaders.value.map(h => {
+                            const match = schedules.value.find(s => s.date === h.date && s.station === st);
+                            return match ? match.staff : '';
+                        });
+                        return { station: st, cells };
+                    });
+                    if (rows.length > 0) {
+                        // 顏色標籤
+                        let badgeClass = 'bg-slate-500';
+                        if (key === '雙連') badgeClass = 'bg-blue-500';
+                        if (key === '士林') badgeClass = 'bg-emerald-500';
+                        if (key === '石牌') badgeClass = 'bg-amber-500';
+                        
+                        groups.push({ name: key, rows, badgeClass });
+                    }
+                });
+                return groups;
+            });
+
+            // [Analysis] 統計
+            const analysisStats = computed(() => {
+                return uniqueStaffList.value.filter(name => compareList.value.includes(name)).map(name => {
+                    const shifts = schedules.value.filter(s => s.staff === name);
+                    const total = shifts.length;
+                    const shuanglian = shifts.filter(s => s.drawer === '雙連').length;
+                    const shilin = shifts.filter(s => s.drawer === '士林').length;
+                    const shipai = shifts.filter(s => s.drawer === '石牌').length;
+                    
+                    // 顏色
+                    const idx = compareList.value.indexOf(name);
+                    const colors = ['bg-red-500', 'bg-yellow-500', 'bg-green-500', 'bg-blue-500'];
+
+                    // 營收預估
+                    let rate = 1;
+                    if (total >= 20) rate = 0.85; else if (total >= 10) rate = 0.9;
+                    const revenue = Math.round(total * 800 * rate);
+
+                    return {
+                        name,
+                        totalCount: total,
+                        revenue,
+                        colorClass: colors[idx] || 'bg-slate-500',
+                        dist: {
+                            shuanglian: total ? Math.round(shuanglian/total*100) : 0,
+                            shilin: total ? Math.round(shilin/total*100) : 0,
+                            shipai: total ? Math.round(shipai/total*100) : 0
+                        }
+                    };
+                });
+            });
+
+            const activeComparison = computed(() => compareList.value.filter(x => x));
+
+            // 樣式 Helper
+            const getComparisonColorClass = (staffName) => {
                 if (!staffName) return '';
                 const idx = compareList.value.indexOf(staffName);
                 if (idx === 0) return 'hl-red';
@@ -408,79 +542,71 @@
                 return '';
             };
 
-            // --- 統計分析 ---
-            const getStaffCount = (name) => schedules.value.filter(s => s.staff === name).length;
-            const uniqueStaffList = computed(() => [...new Set(schedules.value.map(s => s.staff))].sort());
-
-            const getStaffDistribution = (name) => {
-                const total = getStaffCount(name);
-                if (total === 0) return {};
-                const dist = { '雙連': 0, '士林': 0, '石牌': 0 };
-                schedules.value.filter(s => s.staff === name).forEach(s => {
-                    if (dist[s.drawer] !== undefined) dist[s.drawer]++;
-                });
-                return {
-                    '雙連': Math.round(dist['雙連']/total*100),
-                    '士林': Math.round(dist['士林']/total*100),
-                    '石牌': Math.round(dist['石牌']/total*100)
-                };
-            };
-
-            // --- 功能按鈕 ---
-            const uploadToFirebase = () => {
-                // 這裡模擬上傳動作
-                const btn = document.querySelector('.fa-cloud-upload-alt').parentElement;
-                const originalText = btn.innerHTML;
-                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 上傳中...';
-                setTimeout(() => {
-                    alert('已成功將 CSV 暫存至 Firebase 雲端資料庫！\n(路徑: /backups/2026-schedule-temp.csv)');
-                    btn.innerHTML = originalText;
-                }, 1000);
-            };
-
-            // 看板週曆資料生成 (同前版，略微簡化適配)
-            const getDrawerWeeks = (drawerKey) => {
-                const dates = [...new Set(filteredSchedules.value.map(s => s.date))].sort();
-                if(dates.length === 0) return [];
-                const start = new Date(dates[0]);
-                const end = new Date(dates[dates.length-1]);
-                start.setDate(start.getDate() - (start.getDay()===0?6:start.getDay()-1)); // Monday
-                
-                const weeks = [];
-                let curr = new Date(start);
-                let lastMonth = -1;
-
-                while (curr <= end) {
-                    const week = { days: [], monthLabel: '' };
-                    for (let i=0; i<5; i++) {
-                        const dStr = curr.toISOString().slice(0,10);
-                        const m = curr.getMonth()+1;
-                        if(m !== lastMonth && i===0) {
-                            week.monthLabel = `${curr.getFullYear()}/${m}`;
-                            lastMonth = m;
-                        }
-                        const shifts = schedules.value.filter(s => s.date === dStr && s.drawer === drawerKey);
-                        week.days.push({ dayNum: curr.getDate(), isCurrentMonth: true, shifts }); // 簡化邏輯
-                        curr.setDate(curr.getDate()+1);
+            // 互動功能
+            const editShiftCard = (shift) => {
+                Swal.fire({
+                    title: '編輯排班',
+                    html: `
+                        <div class="text-left">
+                            <label class="text-xs text-slate-500">廠商名稱</label>
+                            <input id="swal-staff" class="w-full border rounded p-1 mb-2" value="${shift.staff}">
+                            <button id="swal-del" class="text-xs text-red-500 hover:underline">刪除此排班</button>
+                        </div>
+                    `,
+                    showCancelButton: true,
+                    confirmButtonText: '保存',
+                    confirmButtonColor: '#10b981',
+                    didOpen: () => {
+                        document.getElementById('swal-del').addEventListener('click', () => {
+                            schedules.value = schedules.value.filter(s => s.id !== shift.id);
+                            Swal.close();
+                        });
                     }
-                    weeks.push(week);
-                    curr.setDate(curr.getDate()+2);
-                }
-                return weeks;
+                }).then((res) => {
+                    if (res.isConfirmed) {
+                        const newName = document.getElementById('swal-staff').value;
+                        const idx = schedules.value.findIndex(s => s.id === shift.id);
+                        if (idx !== -1) schedules.value[idx].staff = newName;
+                    }
+                });
             };
-            
-            const getFilteredShiftCount = (key) => filteredSchedules.value.filter(s => s.drawer === key).length;
+
+            // 檔案操作
+            const uploadToFirebase = () => {
+                Swal.fire({
+                    title: '上傳至雲端',
+                    text: '正在模擬連線 Firebase...',
+                    timer: 1500,
+                    timerProgressBar: true,
+                    didOpen: () => { Swal.showLoading(); }
+                }).then(() => {
+                    Swal.fire('上傳成功', '資料已同步至資料庫', 'success');
+                });
+            };
+
+            const downloadCSV = () => {
+                const csv = Papa.unparse(schedules.value); 
+                // 注意：這裡應該要轉回原始矩陣格式比較好，但為求演示先轉扁平
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement("a");
+                const url = URL.createObjectURL(blob);
+                link.setAttribute("href", url);
+                link.setAttribute("download", `schedule_v8_${new Date().toISOString().slice(0,10)}.csv`);
+                link.click();
+            };
 
             onMounted(() => {
                 processCSV();
             });
 
             return {
-                csvInput, showInput, processCSV, currentView, dateFilter,
-                drawers, drawerRefs, syncScroll,
-                matrixData, getMatrixCellClass, compareList, uniqueStaffList,
-                getStaffCount, getStaffDistribution, targetStaff, getComparisonColorClass,
-                getDrawerWeeks, getFilteredShiftCount, uploadToFirebase
+                currentView,
+                showInput, csvInput, processCSV,
+                drawers, calendarWeeks, getShifts, getDrawerShiftCount, truncateName, handleSyncScroll,
+                matrixHeaders, matrixGroups,
+                compareList, uniqueStaffList, analysisStats, activeComparison,
+                getComparisonColorClass, editShiftCard,
+                uploadToFirebase, downloadCSV
             };
         }
     }).mount('#app');
