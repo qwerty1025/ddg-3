@@ -2,67 +2,64 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>點點綠排班戰略系統 v9.5.main (Cloud Ready)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>點點綠排班戰略系統 v9.7 (Mobile First)</title>
     
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <style>
-        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f8fafc; color: #334155; overflow: hidden; }
+        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f1f5f9; color: #334155; overflow: hidden; touch-action: manipulation; }
         .font-mono { font-family: 'JetBrains Mono', monospace; }
 
-        /* 捲軸與容器 */
+        /* Custom Scrollbar */
         .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-        .matrix-container { overflow: auto; height: 85vh; background: white; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
         
-        /* 總表樣式 */
+        /* Matrix & Table Styles */
+        .matrix-container { overflow: auto; height: 85vh; background: white; border: 1px solid #e2e8f0; }
         .matrix-table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 0.75rem; }
         .matrix-table th, .matrix-table td { border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; padding: 4px 8px; white-space: nowrap; text-align: center; height: 32px; }
         .matrix-table thead th { background-color: #f8fafc; position: sticky; top: 0; z-index: 20; font-weight: 700; color: #475569; }
         .matrix-table td:first-child, .matrix-table th:first-child { position: sticky; left: 0; background-color: #fff; z-index: 30; font-weight: 700; text-align: left; border-right: 2px solid #64748b; color: #1e293b; }
         .matrix-table th:first-child { z-index: 40; background-color: #f1f5f9; }
         
-        /* 視覺優化 */
-        .station-group-bg-odd { background-color: #ffffff; }
-        .station-group-bg-even { background-color: #f8fafc; }
         .shilin-bg { background-color: #f0fdf4 !important; }
         .station-divider { border-top: 3px solid #334155 !important; }
 
-        /* 看板樣式 */
-        .kanban-col { flex: 1; min-width: 320px; background: #f1f5f9; border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; border: 1px solid #e2e8f0; }
-        .shift-card { font-size: 0.7rem; padding: 2px 6px; margin-bottom: 2px; background: white; border-radius: 4px; border-left: 3px solid #cbd5e1; box-shadow: 0 1px 1px rgba(0,0,0,0.05); cursor: pointer; transition: all 0.1s; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; position: relative; }
-        .shift-card:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        /* Kanban Styles */
+        .kanban-col { flex: 1; min-width: 300px; background: #f8fafc; border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; border: 1px solid #e2e8f0; }
+        .shift-card { font-size: 0.75rem; padding: 4px 8px; margin-bottom: 4px; background: white; border-radius: 6px; border-left: 4px solid #cbd5e1; box-shadow: 0 1px 2px rgba(0,0,0,0.05); cursor: pointer; transition: all 0.1s; position: relative; }
         .shift-leave { opacity: 0.6; text-decoration: line-through; background-color: #fef2f2; border-left-color: #ef4444; }
-        .shift-has-sales { border-right: 3px solid #f59e0b; }
+        .shift-has-sales { border-right: 4px solid #f59e0b; }
 
-        /* 四色戰隊 */
-        .hl-red { background-color: #fef2f2 !important; color: #b91c1c; border-left-color: #ef4444 !important; font-weight: bold; }
-        .hl-yellow { background-color: #fefce8 !important; color: #854d0e; border-left-color: #eab308 !important; font-weight: bold; }
-        .hl-green { background-color: #f0fdf4 !important; color: #15803d; border-left-color: #22c55e !important; font-weight: bold; }
-        .hl-blue { background-color: #eff6ff !important; color: #1e40af; border-left-color: #3b82f6 !important; font-weight: bold; }
+        /* PK Colors (8 Teams) */
+        .pk-0 { background-color: #fef2f2 !important; border-left-color: #ef4444 !important; } 
+        .pk-1 { background-color: #fffbeb !important; border-left-color: #f59e0b !important; } 
+        .pk-2 { background-color: #f0fdf4 !important; border-left-color: #22c55e !important; } 
+        .pk-3 { background-color: #eff6ff !important; border-left-color: #3b82f6 !important; } 
+        .pk-4 { background-color: #faf5ff !important; border-left-color: #a855f7 !important; }
+        .pk-5 { background-color: #fdf2f8 !important; border-left-color: #ec4899 !important; }
+        .pk-6 { background-color: #ecfeff !important; border-left-color: #06b6d4 !important; }
+        .pk-7 { background-color: #f7fee7 !important; border-left-color: #84cc16 !important; }
 
-        /* 列印專用樣式 */
-        @media print {
-            @page { size: A4 portrait; margin: 10mm; }
-            body * { visibility: hidden; }
-            #print-area, #print-area * { visibility: visible; }
-            #print-area { position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: white; overflow: visible; }
-            .no-print { display: none !important; }
-        }
-        
-        .print-card { border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; margin-bottom: 10px; page-break-inside: avoid; background: white; }
-        .print-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; font-size: 0.8rem; }
-        .print-day { border: 1px solid #e2e8f0; height: 60px; padding: 2px; display: flex; flex-direction: column; justify-content: space-between; }
-        .print-active { background-color: #f0fdf4; font-weight: bold; color: #166534; border-color: #86efac; }
+        /* Mobile Sales Portal Styles */
+        .mobile-portal { position: fixed; inset: 0; z-index: 100; background-color: #f8fafc; display: flex; flex-direction: column; }
+        .mobile-card { background: white; border-radius: 12px; padding: 16px; margin-bottom: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }
+        .mobile-input { width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 16px; background-color: #fff; appearance: none; }
+        .mobile-input:focus { border-color: #4f46e5; outline: none; ring: 2px solid #c7d2fe; }
+
+        /* Visual Bar for Stats */
+        .stat-bar { height: 6px; display: flex; border-radius: 3px; overflow: hidden; width: 100%; background: #f1f5f9; margin-top: 4px; }
+        .stat-seg { height: 100%; }
 
         [v-cloak] { display: none; }
+        .fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }
+        .fade-enter-from, .fade-leave-to { opacity: 0; }
     </style>
 </head>
 <body>
@@ -70,74 +67,133 @@
 <div id="app" v-cloak class="h-screen flex flex-col">
 
     <header class="h-14 bg-slate-900 text-white flex items-center justify-between px-4 shadow-md z-50 shrink-0 no-print">
-        <div class="flex items-center gap-4">
-            <div class="flex items-center gap-2">
-                <div class="w-8 h-8 bg-amber-500 rounded flex items-center justify-center font-bold text-white shadow-lg">v9.5</div>
-                <h1 class="font-bold text-lg hidden md:block">排班戰略系統 <span class="text-xs text-slate-400 font-normal">Cloud Ready</span></h1>
-            </div>
+        <div class="flex items-center gap-3">
+            <div class="w-8 h-8 bg-gradient-to-br from-emerald-400 to-teal-600 rounded flex items-center justify-center font-bold text-white shadow-lg">v9.7</div>
+            <h1 class="font-bold text-lg hidden md:block">排班戰略系統</h1>
             
-            <div class="bg-slate-800 p-1 rounded flex gap-1">
-                <button @click="currentView='kanban'" :class="navClass('kanban')" class="px-3 py-1 text-xs rounded transition"><i class="fa-solid fa-columns"></i> 看板</button>
-                <button @click="currentView='matrix'" :class="navClass('matrix')" class="px-3 py-1 text-xs rounded transition"><i class="fa-solid fa-table-cells"></i> 總表</button>
-                <button @click="currentView='analysis'" :class="navClass('analysis')" class="px-3 py-1 text-xs rounded transition"><i class="fa-solid fa-chart-pie"></i> 分析(租金)</button>
-                <button @click="currentView='vendor'" :class="navClass('vendor')" class="px-3 py-1 text-xs rounded transition"><i class="fa-solid fa-users-gear"></i> 廠商管理</button>
-                <button @click="currentView='myschedule'" :class="navClass('myschedule')" class="px-3 py-1 text-xs rounded transition bg-indigo-600 hover:bg-indigo-500 text-white font-bold"><i class="fa-solid fa-print"></i> 列印</button>
+            <div class="md:hidden flex bg-slate-800 rounded overflow-hidden">
+                <button @click="currentView='kanban'" :class="currentView==='kanban'?'bg-emerald-600':''" class="p-2 text-xs"><i class="fa-solid fa-columns"></i></button>
+                <button @click="currentView='mobile_report'" :class="currentView==='mobile_report'?'bg-emerald-600':''" class="p-2 text-xs"><i class="fa-solid fa-pen-to-square"></i></button>
             </div>
         </div>
 
-        <div v-if="currentView !== 'myschedule' && currentView !== 'vendor'" class="hidden md:flex items-center gap-2 bg-slate-800 px-3 py-1 rounded border border-slate-700">
-            <span class="text-xs text-slate-400">PK模式:</span>
-            <select v-model="compareList[0]" class="bg-red-900/30 text-red-200 border-red-900 text-xs rounded w-20"><option value="">紅隊</option><option v-for="s in uniqueStaffList" :value="s">{{s}}</option></select>
-            <select v-model="compareList[1]" class="bg-yellow-900/30 text-yellow-200 border-yellow-900 text-xs rounded w-20"><option value="">黃隊</option><option v-for="s in uniqueStaffList" :value="s">{{s}}</option></select>
-            <select v-model="compareList[2]" class="bg-green-900/30 text-green-200 border-green-900 text-xs rounded w-20"><option value="">綠隊</option><option v-for="s in uniqueStaffList" :value="s">{{s}}</option></select>
-            <select v-model="compareList[3]" class="bg-blue-900/30 text-blue-200 border-blue-900 text-xs rounded w-20"><option value="">藍隊</option><option v-for="s in uniqueStaffList" :value="s">{{s}}</option></select>
+        <div class="hidden md:flex bg-slate-800 p-1 rounded gap-1">
+            <button @click="currentView='kanban'" :class="navClass('kanban')" class="px-3 py-1 text-xs rounded transition"><i class="fa-solid fa-columns"></i> 看板</button>
+            <button @click="currentView='matrix'" :class="navClass('matrix')" class="px-3 py-1 text-xs rounded transition"><i class="fa-solid fa-table-cells"></i> 總表</button>
+            <button @click="currentView='analysis'" :class="navClass('analysis')" class="px-3 py-1 text-xs rounded transition"><i class="fa-solid fa-chart-line"></i> 分析</button>
+            <button @click="currentView='mobile_report'" :class="navClass('mobile_report')" class="px-3 py-1 text-xs rounded transition bg-amber-600 text-white hover:bg-amber-500 shadow"><i class="fa-solid fa-mobile-screen"></i> 業績回報</button>
+            <button @click="currentView='settings'" :class="navClass('settings')" class="px-3 py-1 text-xs rounded transition"><i class="fa-solid fa-toolbox"></i> 設定</button>
         </div>
 
-        <div class="flex items-center gap-2">
-            <button @click="saveToCloud" class="text-xs bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-white" title="模擬儲存到雲端">
-                <i class="fa-solid fa-cloud-arrow-up"></i> 儲存
+        <div class="flex items-center gap-3">
+            <button @click="showPKModal = true" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1 rounded text-xs font-bold shadow">
+                PK戰情 <span v-if="pkList.length" class="ml-1 bg-white text-indigo-600 px-1 rounded-full text-[9px]">{{pkList.length}}</span>
             </button>
-            <button @click="showInput = !showInput" class="text-slate-400 hover:text-white" title="匯入 CSV"><i class="fa-solid fa-file-csv"></i></button>
+            <button @click="showInput = !showInput" class="text-slate-400 hover:text-white"><i class="fa-solid fa-file-import"></i></button>
         </div>
     </header>
 
-    <div v-if="showInput" class="absolute inset-0 bg-slate-900/90 z-[60] flex items-center justify-center p-4 no-print">
-        <div class="bg-white w-full max-w-4xl rounded-lg h-[80vh] flex flex-col p-4">
-            <div class="flex justify-between mb-2">
-                <h3 class="font-bold">資料匯入 (CSV)</h3>
-                <div>
-                    <button @click="processCSV" class="bg-emerald-600 text-white px-4 py-1 rounded text-sm mr-2">解析並覆蓋</button>
-                    <button @click="showInput = false" class="text-slate-500"><i class="fa-solid fa-times"></i></button>
+    <transition name="fade">
+        <div v-if="currentView === 'mobile_report'" class="mobile-portal custom-scroll overflow-y-auto">
+            <div class="bg-slate-900 text-white p-4 sticky top-0 z-50 shadow-md">
+                <div class="flex justify-between items-center mb-4">
+                    <div class="flex items-center gap-2">
+                        <button @click="currentView='kanban'" class="text-slate-400 mr-2"><i class="fa-solid fa-arrow-left"></i> 返回</button>
+                        <h2 class="font-bold text-lg">業績回報模式</h2>
+                    </div>
+                    <button @click="saveAll" class="bg-emerald-500 text-white px-4 py-1.5 rounded-full text-sm font-bold shadow-lg active:scale-95 transition">
+                        <i class="fa-solid fa-save"></i> 儲存
+                    </button>
+                </div>
+                
+                <select v-model="reportTargetId" class="w-full bg-slate-800 text-white border border-slate-700 rounded p-2 text-sm mb-3">
+                    <option v-for="v in sortedVendorOptions" :key="v.id" :value="v.id">
+                        {{ v.displayName }} ({{ v.count }}場)
+                    </option>
+                </select>
+
+                <div class="flex justify-between text-xs bg-slate-800/50 p-2 rounded border border-slate-700">
+                    <div class="text-center w-1/3 border-r border-slate-700">
+                        <div class="text-slate-400">總場次</div>
+                        <div class="font-bold text-lg">{{ vendorReportStats.count }}</div>
+                    </div>
+                    <div class="text-center w-1/3 border-r border-slate-700">
+                        <div class="text-slate-400">平均業績</div>
+                        <div class="font-bold text-lg text-amber-400">${{ vendorReportStats.avg.toLocaleString() }}</div>
+                    </div>
+                    <div class="text-center w-1/3">
+                        <div class="text-slate-400">總營收</div>
+                        <div class="font-bold text-lg text-emerald-400">${{ vendorReportStats.total.toLocaleString() }}</div>
+                    </div>
                 </div>
             </div>
-            <p class="text-xs text-slate-500 mb-2">請貼上完整的排班 CSV 內容。系統將自動解析日期與廠商。注意：這將會覆蓋當前的排班資料。</p>
-            <textarea v-model="csvInput" class="flex-grow p-2 font-mono text-xs border rounded" placeholder="在此貼上 CSV..."></textarea>
+
+            <div class="p-4 pb-20 max-w-2xl mx-auto w-full">
+                <div v-if="vendorReportShifts.length === 0" class="text-center text-slate-400 mt-10">
+                    <i class="fa-solid fa-calendar-xmark text-4xl mb-2"></i>
+                    <p>此廠商目前沒有排班資料</p>
+                </div>
+
+                <div v-for="(shift, idx) in vendorReportShifts" :key="shift.id" class="mobile-card">
+                    <div class="flex justify-between items-center border-b pb-2 mb-3">
+                        <div class="flex items-center gap-2">
+                            <div class="bg-slate-100 text-slate-600 font-bold px-2 py-1 rounded text-sm text-center min-w-[50px]">
+                                <div>{{ shift.dateObj.month }}/{{ shift.dateObj.day }}</div>
+                            </div>
+                            <div>
+                                <div class="font-bold text-slate-800">{{ shift.dateObj.weekday }}</div>
+                                <div class="text-xs text-slate-500">{{ shift.station }}</div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <label class="flex items-center gap-1 text-xs bg-slate-50 px-2 py-1 rounded border">
+                                <input type="checkbox" v-model="shift.isLeave" @change="toggleLeave(shift)" class="accent-red-500">
+                                <span :class="shift.isLeave ? 'text-red-500 font-bold' : 'text-slate-400'">請假</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div v-if="!shift.isLeave" class="space-y-3">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1">當日業績 ($)</label>
+                            <input type="tel" v-model.number="shift.sales" class="mobile-input text-right font-mono text-xl font-bold text-emerald-700" placeholder="0">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1">備註 / 時間調整</label>
+                            <input type="text" v-model="shift.timeAdjustment" class="mobile-input text-sm" placeholder="例如: 晚到, 提早收...">
+                        </div>
+                    </div>
+                    <div v-else class="text-center py-4 bg-red-50 rounded text-red-400 text-sm">
+                        此場次已標記為請假
+                    </div>
+                </div>
+            </div>
         </div>
-    </div>
+    </transition>
 
-    <main class="flex-grow p-4 overflow-hidden relative bg-slate-100">
-
+    <main v-if="currentView !== 'mobile_report'" class="flex-grow p-4 overflow-hidden relative">
+        
         <div v-if="currentView === 'kanban'" class="h-full flex gap-3 overflow-x-auto pb-2">
             <div v-for="drawer in drawers" :key="drawer.key" class="kanban-col shadow-sm">
                 <div class="p-3 border-b bg-white flex justify-between items-center sticky top-0 z-10">
                     <div class="flex items-center gap-2"><div class="w-1.5 h-6 rounded-full" :class="drawer.colorClass"></div><span class="font-bold text-slate-700">{{ drawer.name }}區</span></div>
                     <div class="text-[10px] text-slate-400 border rounded px-1">{{ getDrawerShiftCount(drawer.key) }}場</div>
                 </div>
-                <div class="overflow-y-auto custom-scrollbar flex-grow p-1 sync-scroll-target" @scroll="handleSyncScroll">
-                    <div v-for="week in calendarWeeks" :key="week.id" class="mb-1">
-                        <div v-if="week.isMonthStart" class="text-[10px] font-bold text-slate-400 pl-1 mt-2 mb-1 border-l-2 border-emerald-400">{{ week.monthLabel }}</div>
+                <div class="overflow-y-auto custom-scrollbar flex-grow p-2 sync-scroll-target" @scroll="handleSyncScroll">
+                    <div v-for="week in calendarWeeks" :key="week.id" class="mb-2">
+                        <div v-if="week.isMonthStart" class="text-[11px] font-bold text-slate-500 bg-slate-100 py-1 px-2 rounded mb-2 shadow-sm sticky top-0 z-0">{{ week.monthLabel }}</div>
                         <div class="grid grid-cols-5 gap-1">
                             <div v-for="day in week.days" :key="day.dateStr" class="min-h-[80px] bg-white border border-slate-200 rounded p-1 hover:bg-slate-50 relative">
-                                <div class="text-[10px] text-slate-300 mb-1 flex justify-between">
-                                    <span>{{ day.dayNum }}</span>
-                                    <span class="text-[9px]">{{ day.weekday }}</span>
+                                <div class="text-[10px] text-slate-400 mb-1 flex justify-between border-b pb-1">
+                                    <span :class="{'text-emerald-600 font-bold': day.isToday}">{{ day.dayNum }}</span>
+                                    <span>{{ day.weekday }}</span>
                                 </div>
                                 <div v-for="shift in getShifts(day.dateStr, drawer.key)" :key="shift.id" 
                                      class="shift-card" 
-                                     :class="[getComparisonColorClass(getDisplayStaff(shift)), shift.status === 'leave' ? 'shift-leave' : '', shift.sales > 0 ? 'shift-has-sales' : '']" 
-                                     @click="openShiftDetail(shift)">
-                                    {{ truncateName(getDisplayStaff(shift)) }}
-                                    <span v-if="shift.sales > 0" class="text-[8px] text-amber-600 block">${{shift.sales}}</span>
+                                     :class="[getPKColorClass(shift.vendorId), shift.status === 'leave' ? 'shift-leave' : '', shift.sales > 0 ? 'shift-has-sales' : '']"
+                                     @click="quickEditShift(shift)">
+                                    <div class="font-bold truncate">{{ truncateName(getDisplayStaff(shift)) }}</div>
+                                    <div v-if="shift.sales > 0" class="text-[9px] text-amber-600 font-mono mt-0.5">${{shift.sales}}</div>
                                 </div>
                             </div>
                         </div>
@@ -147,7 +203,7 @@
             </div>
         </div>
 
-        <div v-if="currentView === 'matrix'" class="matrix-container custom-scrollbar">
+        <div v-if="currentView === 'matrix'" class="matrix-container custom-scrollbar rounded-lg shadow-sm">
             <table class="matrix-table">
                 <thead>
                     <tr>
@@ -161,14 +217,14 @@
                 <tbody>
                     <template v-for="(group, gIndex) in matrixGroups" :key="group.name">
                         <tr v-for="(row, rIndex) in group.rows" :key="row.station" 
-                            :class="[gIndex % 2 === 0 ? 'station-group-bg-odd' : 'station-group-bg-even', rIndex === 0 && gIndex !== 0 ? 'station-divider' : '', row.isShilin ? 'shilin-bg' : '']">
+                            :class="[gIndex % 2 === 0 ? 'bg-white' : 'bg-slate-50', rIndex === 0 && gIndex !== 0 ? 'station-divider' : '', row.isShilin ? 'shilin-bg' : '']">
                             <td>
                                 <div class="flex items-center justify-between">
                                     <span>{{ row.station }}</span>
                                     <span v-if="rIndex === 0" class="text-[9px] px-1 rounded text-white font-bold" :class="group.badgeClass">{{ group.name }}</span>
                                 </div>
                             </td>
-                            <td v-for="(cell, i) in row.cells" :key="i" :class="getComparisonColorClass(cell?.name)" @click="cell?.shift ? openShiftDetail(cell.shift) : null" class="cursor-pointer hover:bg-slate-100">
+                            <td v-for="(cell, i) in row.cells" :key="i" :class="getPKColorClass(cell?.vendorId)" class="cursor-pointer hover:brightness-95 transition">
                                 <span :class="{'line-through text-slate-300': cell?.status === 'leave'}">{{ cell?.name }}</span>
                             </td>
                         </tr>
@@ -178,597 +234,364 @@
         </div>
 
         <div v-if="currentView === 'analysis'" class="h-full bg-white rounded-lg shadow overflow-hidden flex flex-col">
-            <div class="p-4 border-b bg-slate-50 flex justify-between items-center">
-                <div>
-                    <h3 class="font-bold text-slate-700">營運分析與租金預估 (v9.5)</h3>
-                    <div class="text-xs text-slate-500 mt-1">
-                        * P1: 11-1月, P2: 2-4月 | 租金公式：基礎$800/場，20場以上85折，10場以上9折
-                    </div>
-                </div>
+            <div class="p-4 bg-slate-50 border-b">
+                <h3 class="font-bold text-slate-700">營運分析報表 (v9.7)</h3>
+                <p class="text-xs text-slate-500">含站點佔比分析：藍色(雙連) / 綠色(士林) / 黃色(石牌)</p>
             </div>
             <div class="overflow-auto p-4 custom-scrollbar flex-grow">
                 <table class="w-full text-xs text-left border-collapse">
                     <thead class="bg-slate-100 sticky top-0 text-slate-500 uppercase z-10">
                         <tr>
-                            <th class="px-3 py-2">#</th>
-                            <th class="px-3 py-2">廠商名稱 (合併後)</th>
+                            <th class="px-3 py-2">廠商</th>
                             <th class="px-3 py-2 text-center border-l">P1 場次</th>
-                            <th class="px-3 py-2 text-center">P2 場次</th>
-                            <th class="px-3 py-2 text-center border-r">成長率</th>
-                            <th class="px-3 py-2 text-center text-amber-700 bg-amber-50">P1 雙/士/石</th>
-                            <th class="px-3 py-2 text-center text-emerald-700 bg-emerald-50">P2 雙/士/石</th>
-                            <th class="px-3 py-2 text-right border-l">P1 預估租金</th>
-                            <th class="px-3 py-2 text-right">P2 預估租金</th>
-                            <th class="px-3 py-2 text-right font-bold bg-slate-50">總租金</th>
+                            <th class="px-3 py-2 w-32 text-center">P1 站點分佈</th>
+                            <th class="px-3 py-2 text-center border-l">P2 場次</th>
+                            <th class="px-3 py-2 w-32 text-center">P2 站點分佈</th>
+                            <th class="px-3 py-2 text-right border-l">總預估租金</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
-                        <tr v-for="(stat, idx) in analysisStats" :key="stat.name" :class="getRowColor(stat.tier)">
-                            <td class="px-3 py-2 font-mono text-slate-400">{{ idx+1 }}</td>
-                            <td class="px-3 py-2 font-bold flex items-center gap-2">
-                                {{ stat.name }}
-                                <span v-if="stat.isMerged" class="text-[9px] bg-indigo-100 text-indigo-700 px-1 rounded">合</span>
-                            </td>
+                        <tr v-for="stat in analysisStats" :key="stat.name" class="hover:bg-slate-50">
+                            <td class="px-3 py-2 font-bold text-slate-700">{{ stat.name }}</td>
                             <td class="px-3 py-2 text-center border-l">{{ stat.p1Count }}</td>
-                            <td class="px-3 py-2 text-center font-bold">{{ stat.p2Count }}</td>
-                            <td class="px-3 py-2 text-center border-r">
-                                <span :class="stat.growth >= 0 ? 'text-green-600' : 'text-red-500'">{{ stat.growth }}%</span>
+                            <td class="px-3 py-2">
+                                <div class="stat-bar" v-if="stat.p1Count > 0">
+                                    <div class="stat-seg bg-blue-400" :style="{width: stat.p1Ratio.shuan + '%'}"></div>
+                                    <div class="stat-seg bg-emerald-500" :style="{width: stat.p1Ratio.shilin + '%'}"></div>
+                                    <div class="stat-seg bg-amber-400" :style="{width: stat.p1Ratio.shipai + '%'}"></div>
+                                </div>
+                                <div class="text-[9px] text-slate-400 text-center mt-1">{{stat.p1Ratio.text}}</div>
                             </td>
-                            <td class="px-3 py-2 text-center font-mono text-[10px] bg-amber-50/30">{{ stat.p1Dist }}</td>
-                            <td class="px-3 py-2 text-center font-mono text-[10px] bg-emerald-50/30">{{ stat.p2Dist }}</td>
-                            <td class="px-3 py-2 text-right border-l text-slate-400">${{ stat.p1Rent.toLocaleString() }}</td>
-                            <td class="px-3 py-2 text-right font-bold text-slate-600">${{ stat.p2Rent.toLocaleString() }}</td>
-                            <td class="px-3 py-2 text-right font-bold text-emerald-700 bg-slate-50">${{ stat.totalRent.toLocaleString() }}</td>
+                            <td class="px-3 py-2 text-center border-l">{{ stat.p2Count }}</td>
+                            <td class="px-3 py-2">
+                                <div class="stat-bar" v-if="stat.p2Count > 0">
+                                    <div class="stat-seg bg-blue-400" :style="{width: stat.p2Ratio.shuan + '%'}"></div>
+                                    <div class="stat-seg bg-emerald-500" :style="{width: stat.p2Ratio.shilin + '%'}"></div>
+                                    <div class="stat-seg bg-amber-400" :style="{width: stat.p2Ratio.shipai + '%'}"></div>
+                                </div>
+                                <div class="text-[9px] text-slate-400 text-center mt-1">{{stat.p2Ratio.text}}</div>
+                            </td>
+                            <td class="px-3 py-2 text-right border-l font-mono text-emerald-700 font-bold">${{ stat.totalRent.toLocaleString() }}</td>
                         </tr>
                     </tbody>
                 </table>
             </div>
         </div>
 
-        <div v-if="currentView === 'vendor'" class="h-full bg-white rounded-lg shadow overflow-hidden flex flex-col">
-            <div class="p-4 border-b bg-slate-50 flex justify-between items-center">
-                <h3 class="font-bold text-slate-700">廠商資料彙整表 (Merger & Acquisition)</h3>
-                <div class="flex gap-2">
-                    <button @click="autoGenerateVendors" class="text-xs bg-slate-200 hover:bg-slate-300 px-3 py-1 rounded">重新掃描 CSV 建立名單</button>
-                    <button @click="addNewVendor" class="text-xs bg-emerald-600 text-white hover:bg-emerald-700 px-3 py-1 rounded"><i class="fa-solid fa-plus"></i> 新增主廠商</button>
-                </div>
-            </div>
-            <div class="flex-grow overflow-auto p-4 custom-scrollbar">
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div v-for="vendor in vendorList" :key="vendor.id" class="border rounded-lg p-3 shadow-sm bg-white relative group">
-                        <div class="flex justify-between items-start mb-2">
-                            <input v-model="vendor.displayName" class="font-bold text-lg text-slate-800 border-b border-transparent hover:border-slate-300 focus:border-indigo-500 outline-none w-full" placeholder="廠商顯示名稱">
-                            <button @click="deleteVendor(vendor.id)" class="text-slate-300 hover:text-red-500 ml-2"><i class="fa-solid fa-trash"></i></button>
-                        </div>
-                        <div class="text-xs text-slate-400 mb-2 font-mono">{{ vendor.id }}</div>
-                        
-                        <div class="bg-slate-50 rounded p-2 text-xs">
-                            <div class="font-bold text-slate-500 mb-1">CSV 原始名稱映射 (Aliases):</div>
-                            <div class="flex flex-wrap gap-1">
-                                <span v-for="(alias, aidx) in vendor.aliases" :key="aidx" class="bg-white border px-2 py-0.5 rounded flex items-center gap-1">
-                                    {{ alias }}
-                                    <button @click="removeAlias(vendor, alias)" class="text-red-400 hover:text-red-600">×</button>
-                                </span>
-                                <button @click="addAlias(vendor)" class="bg-slate-200 px-2 py-0.5 rounded hover:bg-slate-300 text-slate-600">+</button>
-                            </div>
-                        </div>
-
-                        <div class="mt-2 pt-2 border-t text-xs flex justify-between items-center text-slate-500">
-                            <span>聯絡: <input v-model="vendor.contact" placeholder="電話/Line" class="border-b outline-none w-24"></span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div v-if="currentView === 'myschedule'" class="h-full flex flex-col md:flex-row gap-4">
-            <div class="w-full md:w-80 bg-white p-4 rounded-lg shadow h-full overflow-auto no-print">
-                <h3 class="font-bold text-lg mb-4 border-b pb-2"><i class="fa-solid fa-print"></i> 列印設定</h3>
-                
-                <div class="mb-4">
-                    <label class="block text-xs font-bold mb-1">1. 選擇廠商 (主名稱)</label>
-                    <select v-model="printTarget" class="w-full border rounded p-2 text-sm bg-slate-50">
-                        <option v-for="v in vendorList" :value="v.displayName">{{v.displayName}}</option>
-                    </select>
-                </div>
-
-                <div class="mb-4">
-                    <label class="block text-xs font-bold mb-1">2. 選擇月份</label>
-                    <div class="grid grid-cols-3 gap-2">
-                        <label v-for="m in allMonths" :key="m" class="flex items-center text-xs p-1 border rounded cursor-pointer hover:bg-slate-50">
-                            <input type="checkbox" :value="m" v-model="printMonths" class="mr-1"> {{m}}
-                        </label>
-                    </div>
-                </div>
-
-                <div class="mb-4">
-                    <label class="block text-xs font-bold mb-1">3. 聯絡資訊</label>
-                    <textarea v-model="contactInfo" class="w-full border rounded p-2 text-sm h-20"></textarea>
-                </div>
-
-                <div class="mb-6">
-                    <label class="block text-xs font-bold mb-1">4. QR Code</label>
-                    <input v-model="qrUrl1" placeholder="URL 1" class="w-full border rounded p-1 text-xs mb-2">
-                    <input v-model="qrUrl2" placeholder="URL 2" class="w-full border rounded p-1 text-xs">
-                    <button @click="genQR" class="mt-2 w-full bg-slate-200 text-xs py-1 rounded hover:bg-slate-300">更新 QR</button>
-                </div>
-
-                <button @click="printNow" class="w-full bg-indigo-600 text-white py-3 rounded-lg font-bold shadow hover:bg-indigo-700 transition">
-                    <i class="fa-solid fa-print"></i> 立即列印
-                </button>
-            </div>
-
-            <div id="print-area" class="flex-grow bg-white shadow-2xl p-8 overflow-y-auto">
-                <div class="flex justify-between items-start mb-6 border-b-2 border-slate-800 pb-4">
-                    <div>
-                        <h1 class="text-3xl font-bold text-slate-800 mb-2">{{ printTarget }} 出席班表</h1>
-                        <pre class="text-sm text-slate-600 font-sans whitespace-pre-wrap">{{ contactInfo }}</pre>
-                    </div>
-                    <div class="flex gap-4">
-                        <div v-if="qrUrl1" class="text-center"><div id="qrcode1"></div><span class="text-[10px] text-slate-400">Scan Me</span></div>
-                        <div v-if="qrUrl2" class="text-center"><div id="qrcode2"></div><span class="text-[10px] text-slate-400">Join Us</span></div>
-                    </div>
-                </div>
-
-                <div v-for="month in selectedMonthData" :key="month.label" class="print-card break-inside-avoid">
-                    <h3 class="text-lg font-bold text-center bg-slate-100 py-1 mb-2 rounded border border-slate-200">{{ month.label }}</h3>
-                    <div class="print-grid mb-1 border-b pb-1 font-bold text-slate-500">
-                        <div class="text-red-500">日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div class="text-red-500">六</div>
-                    </div>
-                    <div class="print-grid">
-                        <div v-for="d in month.days" :key="d.dateStr" class="print-day" :class="{'print-active': d.shift && d.shift.status !== 'leave'}">
-                            <div class="text-right text-[10px]" :class="d.isCurrent ? 'text-slate-600' : 'text-slate-200'">{{ d.dayNum }}</div>
-                            <div v-if="d.shift" class="text-xs text-center leading-tight">
-                                <span v-if="d.shift.status === 'leave'" class="text-red-400 line-through">請假</span>
-                                <span v-else>{{ d.shift.station }}</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="mt-8 text-center text-[10px] text-slate-300">Generated by 點點綠排班戰略系統 v9.5</div>
-            </div>
+        <div v-if="currentView === 'settings'" class="h-full bg-white rounded-lg shadow p-8">
+            <h2 class="text-2xl font-bold mb-6">系統設定</h2>
+            <button @click="showInput = true" class="bg-slate-200 text-slate-700 px-4 py-2 rounded mb-4">重匯入 CSV</button>
         </div>
 
     </main>
+
+    <div v-if="showInput" class="fixed inset-0 bg-slate-900/90 z-[80] flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-4xl rounded-lg h-[80vh] flex flex-col p-4">
+            <div class="flex justify-between mb-2">
+                <h3 class="font-bold">原始資料匯入</h3>
+                <button @click="showInput = false" class="text-slate-500"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <textarea v-model="csvInput" class="flex-grow p-2 font-mono text-xs border rounded mb-2" placeholder="Paste CSV here..."></textarea>
+            <div class="flex gap-2">
+                <button @click="processCSV" class="bg-emerald-600 text-white px-4 py-2 rounded font-bold flex-1">開始解析</button>
+                <button @click="loadDemoData" class="bg-slate-500 text-white px-4 py-2 rounded font-bold">載入模擬資料</button>
+            </div>
+        </div>
+    </div>
+
+    <div v-if="showPKModal" class="fixed inset-0 bg-slate-900/80 z-[70] flex items-center justify-center p-4" @click.self="showPKModal = false">
+        <div class="bg-white w-full max-w-lg rounded-xl shadow-2xl p-4 flex flex-col max-h-[70vh]">
+            <h3 class="font-bold mb-4">PK 戰情室 (最多8家)</h3>
+            <div class="flex-grow overflow-y-auto custom-scroll">
+                <div class="grid grid-cols-2 gap-2">
+                    <label v-for="v in sortedVendorOptions" :key="v.id" class="flex items-center p-2 border rounded cursor-pointer hover:bg-slate-50">
+                        <input type="checkbox" :value="v.id" v-model="pkList" :disabled="pkList.length >= 8 && !pkList.includes(v.id)" class="mr-2">
+                        <span class="text-sm truncate flex-grow">{{ v.displayName }}</span>
+                        <span v-if="pkList.includes(v.id)" class="w-3 h-3 rounded-full" :class="getPKColorClass(v.id)"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 <script>
     const { createApp, ref, computed, onMounted, nextTick, watch } = Vue;
 
-    // --- MOCK DATABASE SERVICE (Cloud Ready) ---
-    // In v10, replace localStorage methods with Firebase Firestore calls
-    const DataService = {
-        save: async (key, data) => {
-            return new Promise(resolve => {
-                localStorage.setItem('ddg_' + key, JSON.stringify(data));
-                setTimeout(resolve, 300); // Simulate network delay
-            });
-        },
-        load: async (key) => {
-            return new Promise(resolve => {
-                const data = localStorage.getItem('ddg_' + key);
-                resolve(data ? JSON.parse(data) : null);
-            });
-        }
-    };
-
     createApp({
         setup() {
-            // Data Models
+            // State
+            const currentView = ref('kanban');
+            const showInput = ref(false);
+            const showPKModal = ref(false);
             const csvInput = ref('');
-            const showInput = ref(true); // Default open if no data
-            const currentView = ref('kanban'); 
-            const compareList = ref(['', '', '', '']); 
+            const schedules = ref([]);
+            const vendorList = ref([]);
+            const pkList = ref([]);
             
-            // Core Data
-            const schedules = ref([]); // { id, date, drawer, station, subStation, rawStaff, status, sales, vendorId }
-            const vendorList = ref([]); // { id, displayName, aliases: [], contact: '' }
+            // Mobile Report State
+            const reportTargetId = ref(''); 
 
-            // UI State
-            const printTarget = ref('');
-            const printMonths = ref([]);
-            const contactInfo = ref('訂購專線: 0912-345-678\nLine ID: @example');
-            const qrUrl1 = ref('https://www.facebook.com');
-            const qrUrl2 = ref('');
+            // --- Computed Properties ---
+            
+            // 1. Vendor Sorting & Default Logic
+            const sortedVendorOptions = computed(() => {
+                // Calculate total active shifts for sorting
+                const counts = {};
+                schedules.value.forEach(s => {
+                    if(!counts[s.vendorId]) counts[s.vendorId] = 0;
+                    counts[s.vendorId]++;
+                });
 
-            const drawers = [
-                { key: '雙連', name: '雙連', colorClass: 'bg-blue-500' },
-                { key: '士林', name: '士林', colorClass: 'bg-emerald-500' },
-                { key: '石牌', name: '石牌', colorClass: 'bg-amber-500' }
-            ];
+                return vendorList.value.map(v => ({
+                    ...v,
+                    count: counts[v.id] || 0
+                })).sort((a,b) => b.count - a.count);
+            });
 
-            // --- Business Logic: Vendors ---
+            // 2. Report View Data
+            const vendorReportShifts = computed(() => {
+                if (!reportTargetId.value) return [];
+                const shifts = schedules.value.filter(s => s.vendorId === reportTargetId.value);
+                // Sort by Date
+                return shifts.sort((a,b) => new Date(a.date) - new Date(b.date)).map(s => {
+                    const d = new Date(s.date);
+                    return {
+                        ...s,
+                        dateObj: {
+                            month: d.getMonth() + 1,
+                            day: d.getDate(),
+                            weekday: ['日','一','二','三','四','五','六'][d.getDay()]
+                        },
+                        isLeave: s.status === 'leave'
+                    };
+                });
+            });
 
-            // Find display name based on raw CSV name
-            const getDisplayStaff = (shift) => {
-                const raw = shift.rawStaff;
-                const vendor = vendorList.value.find(v => v.aliases.includes(raw));
-                return vendor ? vendor.displayName : raw;
+            const vendorReportStats = computed(() => {
+                const activeShifts = vendorReportShifts.value.filter(s => !s.isLeave);
+                const total = activeShifts.reduce((sum, s) => sum + (s.sales || 0), 0);
+                const count = activeShifts.length;
+                return {
+                    total,
+                    count,
+                    avg: count > 0 ? Math.round(total / count) : 0
+                };
+            });
+
+            // 3. Analysis Logic (With Station Ratio)
+            const analysisStats = computed(() => {
+                return vendorList.value.map(v => {
+                    const shifts = schedules.value.filter(s => s.vendorId === v.id && s.status !== 'leave');
+                    
+                    const p1Shifts = shifts.filter(s => [11, 12, 1].includes(parseInt(s.date.split('-')[1])));
+                    const p2Shifts = shifts.filter(s => [2, 3, 4].includes(parseInt(s.date.split('-')[1])));
+
+                    const getRatio = (list) => {
+                        const total = list.length || 1;
+                        const shuan = list.filter(s => s.drawer === '雙連').length;
+                        const shilin = list.filter(s => s.drawer === '士林').length;
+                        const shipai = list.filter(s => s.drawer === '石牌').length;
+                        return {
+                            shuan: (shuan/total)*100,
+                            shilin: (shilin/total)*100,
+                            shipai: (shipai/total)*100,
+                            text: `${Math.round((shuan/total)*100)} / ${Math.round((shilin/total)*100)} / ${Math.round((shipai/total)*100)}`
+                        };
+                    };
+
+                    const calcRent = (count) => {
+                        let discount = 1;
+                        if(count >= 20) discount = 0.85;
+                        else if(count >= 10) discount = 0.90;
+                        return Math.round(count * 800 * discount);
+                    };
+
+                    return {
+                        name: v.displayName,
+                        p1Count: p1Shifts.length,
+                        p2Count: p2Shifts.length,
+                        p1Ratio: getRatio(p1Shifts),
+                        p2Ratio: getRatio(p2Shifts),
+                        totalRent: calcRent(p1Shifts.length) + calcRent(p2Shifts.length)
+                    };
+                }).sort((a,b) => b.p2Count - a.p2Count);
+            });
+
+
+            // --- Actions ---
+
+            const toggleLeave = (shift) => {
+                shift.status = shift.isLeave ? 'leave' : 'active';
             };
 
-            // Get vendor ID from raw name
-            const getVendorId = (rawName) => {
-                const vendor = vendorList.value.find(v => v.aliases.includes(rawName));
-                return vendor ? vendor.id : null;
+            const saveAll = () => {
+                localStorage.setItem('v97_schedules', JSON.stringify(schedules.value));
+                localStorage.setItem('v97_vendors', JSON.stringify(vendorList.value));
+                Swal.fire({ icon: 'success', title: '儲存成功', timer: 1000, showConfirmButton: false });
+            };
+
+            const processCSV = () => {
+                if(!csvInput.value) return;
+                const parsed = Papa.parse(csvInput.value, {header:false, skipEmptyLines:true});
+                // ... (CSV parsing logic same as v9.6, condensed here for brevity)
+                const rows = parsed.data;
+                const newSchedules = [];
+                const colMap = {};
+                if(rows.length > 1) {
+                    rows[0].forEach((c,i)=>{ if(i>0){ const m=c.match(/(\d{1,2})\/(\d{1,2})/); if(m) colMap[i]=`${m[1]>=11?2025:2026}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}`;}});
+                    for(let i=1; i<rows.length; i++) {
+                        const row = rows[i]; if(!row[0]) continue;
+                        let drawer = row[0].includes('雙連')?'雙連':row[0].includes('士林')?'士林':'石牌';
+                        row.forEach((cell, idx) => {
+                            if(idx>0 && colMap[idx] && cell.trim()) {
+                                cell.split(/[,，、]/).forEach(raw => {
+                                    if(raw.trim()) newSchedules.push({ id: crypto.randomUUID(), date: colMap[idx], drawer, station: row[0], rawStaff: raw.trim(), status: 'active', sales: 0, vendorId: null });
+                                });
+                            }
+                        });
+                    }
+                    schedules.value = newSchedules;
+                    autoGenerateVendors();
+                    showInput.value = false;
+                }
             };
 
             const autoGenerateVendors = () => {
                 const rawNames = [...new Set(schedules.value.map(s => s.rawStaff))];
                 rawNames.forEach(raw => {
-                    const exists = vendorList.value.find(v => v.aliases.includes(raw));
-                    if (!exists) {
-                        vendorList.value.push({
-                            id: crypto.randomUUID().substring(0,8),
-                            displayName: raw,
-                            aliases: [raw],
-                            contact: ''
-                        });
+                    if(!vendorList.value.some(v => v.displayName === raw)) {
+                        vendorList.value.push({ id: crypto.randomUUID().substring(0,8), displayName: raw });
                     }
                 });
-                saveToCloud();
-            };
-
-            const addNewVendor = () => {
-                vendorList.value.unshift({
-                    id: crypto.randomUUID().substring(0,8),
-                    displayName: '新廠商',
-                    aliases: [],
-                    contact: ''
+                schedules.value.forEach(s => {
+                    const v = vendorList.value.find(vn => vn.displayName === s.rawStaff);
+                    if(v) s.vendorId = v.id;
                 });
+                setDefaultTarget();
             };
 
-            const addAlias = async (vendor) => {
-                const { value: alias } = await Swal.fire({
-                    title: '新增 CSV 原始名稱',
-                    input: 'text',
-                    text: '請輸入 CSV 中出現的名稱 (例如: 廠商A-分店1)'
-                });
-                if (alias) {
-                    // Check if alias used elsewhere
-                    const conflict = vendorList.value.find(v => v.aliases.includes(alias));
-                    if (conflict) {
-                        Swal.fire('錯誤', `此名稱已被 "${conflict.displayName}" 使用`, 'error');
-                        return;
-                    }
-                    vendor.aliases.push(alias);
-                }
+            const setDefaultTarget = () => {
+                const target = vendorList.value.find(v => v.displayName === '五寮尖山羊乳');
+                if(target) reportTargetId.value = target.id;
+                else if(vendorList.value.length > 0) reportTargetId.value = sortedVendorOptions.value[0].id;
             };
 
-            const removeAlias = (vendor, alias) => {
-                vendor.aliases = vendor.aliases.filter(a => a !== alias);
-            };
-
-            const deleteVendor = (id) => {
-                if(confirm('確定刪除此廠商資料？')) {
-                    vendorList.value = vendorList.value.filter(v => v.id !== id);
-                }
-            };
-
-            // --- CSV Processing ---
-            const processCSV = () => {
-                if (!csvInput.value.trim()) return;
-                
-                const results = [];
-                const parsed = Papa.parse(csvInput.value, { header: false, skipEmptyLines: true });
-                const rows = parsed.data;
-                const colMap = {};
-
-                if (rows.length < 2) return;
-
-                // Parse Dates
-                rows[0].forEach((cell, idx) => {
-                    if (idx === 0) return;
-                    const match = cell.match(/(\d{1,2})\/(\d{1,2})/);
-                    if (match) {
-                        const m = parseInt(match[1]);
-                        const d = parseInt(match[2]);
-                        const y = m >= 11 ? 2025 : 2026;
-                        colMap[idx] = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-                    }
-                });
-
-                // Parse Shifts
-                for (let i = 1; i < rows.length; i++) {
-                    const row = rows[i];
-                    const stationRaw = row[0];
-                    if (!stationRaw) continue;
-
-                    let drawerKey = '';
-                    if (stationRaw.includes('雙連')) drawerKey = '雙連';
-                    else if (stationRaw.includes('士林')) drawerKey = '士林';
-                    else if (stationRaw.includes('石牌')) drawerKey = '石牌';
-
-                    row.forEach((cell, idx) => {
-                        if (idx === 0) return;
-                        const date = colMap[idx];
-                        if (date && cell && cell.trim()) {
-                            const staffs = cell.split(/[,，、]/).map(s => s.trim()).filter(s => s);
-                            staffs.forEach(s => {
-                                results.push({
-                                    id: crypto.randomUUID(), // Unique Shift ID
-                                    date,
-                                    drawer: drawerKey,
-                                    station: stationRaw,
-                                    subStation: stationRaw.replace(drawerKey, ''),
-                                    rawStaff: s,
-                                    status: 'active', // active, leave
-                                    sales: 0
-                                });
+            const loadDemoData = () => {
+                // Generate simple mock data including Wuliaojian
+                vendorList.value = [
+                    { id: 'v1', displayName: '五寮尖山羊乳' },
+                    { id: 'v2', displayName: '御品園放牧雞蛋' },
+                    { id: 'v3', displayName: '瑞田有機農場' }
+                ];
+                schedules.value = [];
+                const drawers = ['雙連', '士林', '石牌'];
+                for(let i=0; i<60; i++) {
+                    const d = new Date(2025, 10, 3 + i);
+                    const dateStr = d.toISOString().slice(0,10);
+                    vendorList.value.forEach(v => {
+                        if(Math.random() > 0.6) {
+                            const dr = drawers[Math.floor(Math.random()*3)];
+                            schedules.value.push({
+                                id: crypto.randomUUID(),
+                                date: dateStr,
+                                drawer: dr,
+                                station: dr + '一',
+                                rawStaff: v.displayName,
+                                vendorId: v.id,
+                                status: Math.random() > 0.9 ? 'leave' : 'active',
+                                sales: Math.floor(Math.random() * 3000) + 1000
                             });
                         }
                     });
                 }
-                schedules.value = results;
-                autoGenerateVendors(); // Sync vendors
-                
-                // Set default print month
-                const allMs = [...new Set(results.map(s => s.date.substring(0, 7)))].sort();
-                if(allMs.length > 0) printMonths.value = [allMs[allMs.length-1]];
-                
+                setDefaultTarget();
                 showInput.value = false;
-                saveToCloud();
-            };
-
-            // --- Shift Actions ---
-            const openShiftDetail = async (shift) => {
-                const displayName = getDisplayStaff(shift);
-                
-                const { value: formValues } = await Swal.fire({
-                    title: '編輯班表',
-                    html: `
-                        <div class="text-left text-sm">
-                            <p class="mb-2"><strong>廠商:</strong> ${displayName} (${shift.rawStaff})</p>
-                            <p class="mb-2"><strong>日期:</strong> ${shift.date}</p>
-                            <p class="mb-2"><strong>站點:</strong> ${shift.station}</p>
-                            <hr class="my-2">
-                            <label class="block mb-1">狀態</label>
-                            <select id="swal-status" class="w-full border p-1 mb-2 rounded">
-                                <option value="active" ${shift.status === 'active' ? 'selected' : ''}>正常出席</option>
-                                <option value="leave" ${shift.status === 'leave' ? 'selected' : ''}>請假/取消</option>
-                            </select>
-                            <label class="block mb-1">業績回報 (元)</label>
-                            <input id="swal-sales" type="number" class="w-full border p-1 mb-2 rounded" value="${shift.sales}">
-                        </div>
-                    `,
-                    focusConfirm: false,
-                    showDenyButton: true,
-                    denyButtonText: '刪除此班',
-                    confirmButtonText: '保存變更',
-                    preConfirm: () => {
-                        return {
-                            status: document.getElementById('swal-status').value,
-                            sales: parseInt(document.getElementById('swal-sales').value) || 0
-                        }
-                    }
-                });
-
-                if (formValues) {
-                    shift.status = formValues.status;
-                    shift.sales = formValues.sales;
-                    saveToCloud();
-                } else if (Swal.getDenyButton().click) {
-                     // Check if denied was clicked (SweetAlert2 handling is tricky here, simplifying)
-                }
-            };
-
-            // --- Views Logic ---
-            const calendarWeeks = computed(() => {
-                const dates = [...new Set(schedules.value.map(s => s.date))].sort();
-                if (dates.length === 0) return [];
-                const start = new Date(dates[0]);
-                const end = new Date(dates[dates.length-1]);
-                start.setDate(start.getDate() - (start.getDay() === 0 ? 6 : start.getDay() - 1));
-
-                const weeks = [];
-                let curr = new Date(start);
-                let lastMonth = -1;
-
-                while (curr <= end) {
-                    const days = [];
-                    let monthLabel = '';
-                    let isMonthStart = false;
-
-                    for (let i = 0; i < 5; i++) {
-                        const dStr = curr.toISOString().slice(0, 10);
-                        const m = curr.getMonth() + 1;
-                        if (m !== lastMonth && i === 0) {
-                            monthLabel = `${curr.getFullYear()}年 ${m}月`;
-                            isMonthStart = true;
-                            lastMonth = m;
-                        }
-                        const weekday = ['日','一','二','三','四','五','六'][curr.getDay()];
-                        days.push({ dateStr: dStr, dayNum: curr.getDate(), weekday });
-                        curr.setDate(curr.getDate() + 1);
-                    }
-                    weeks.push({ id: weeks.length, monthLabel, isMonthStart, days });
-                    curr.setDate(curr.getDate() + 2); 
-                }
-                return weeks;
-            });
-
-            // Matrix Data
-            const matrixHeaders = computed(() => {
-                const dates = [...new Set(schedules.value.map(s => s.date))].sort();
-                return dates.map(d => {
-                    const dateObj = new Date(d);
-                    const day = ['日','一','二','三','四','五','六'][dateObj.getDay()];
-                    return { simpleDate: `${dateObj.getMonth()+1}/${dateObj.getDate()}`, dayName: `(${day})`, date: d };
-                });
-            });
-
-            const matrixGroups = computed(() => {
-                const groups = [];
-                const allStations = [...new Set(schedules.value.map(s => s.station))].sort();
-                ['雙連', '士林', '石牌'].forEach(key => {
-                    const myStations = allStations.filter(s => s.includes(key));
-                    const rows = myStations.map(st => {
-                        const cells = matrixHeaders.value.map(h => {
-                            const match = schedules.value.find(s => s.date === h.date && s.station === st);
-                            return match ? { name: getDisplayStaff(match), status: match.status, shift: match } : null;
-                        });
-                        return { station: st, cells, isShilin: key === '士林' };
-                    });
-                    if (rows.length > 0) {
-                        let badgeClass = 'bg-slate-500';
-                        if (key === '雙連') badgeClass = 'bg-blue-500';
-                        if (key === '士林') badgeClass = 'bg-emerald-500';
-                        if (key === '石牌') badgeClass = 'bg-amber-500';
-                        groups.push({ name: key, rows, badgeClass });
-                    }
-                });
-                return groups;
-            });
-
-            // Analysis Data (Using Vendor Map)
-            const analysisStats = computed(() => {
-                // Group shifts by DISPLAY Name (Vendor ID logic)
-                const vendorStats = {};
-
-                schedules.value.forEach(shift => {
-                    if (shift.status === 'leave') return; // Exclude leaves
-                    const dName = getDisplayStaff(shift);
-                    if (!vendorStats[dName]) {
-                        vendorStats[dName] = { shifts: [], isMerged: false };
-                        // Check if merged
-                        const v = vendorList.value.find(v => v.displayName === dName);
-                        if (v && v.aliases.length > 1) vendorStats[dName].isMerged = true;
-                    }
-                    vendorStats[dName].shifts.push(shift);
-                });
-
-                return Object.keys(vendorStats).map(name => {
-                    const data = vendorStats[name];
-                    const shifts = data.shifts;
-                    
-                    const p1Shifts = shifts.filter(s => [11, 12, 1].includes(parseInt(s.date.split('-')[1])));
-                    const p2Shifts = shifts.filter(s => [2, 3, 4].includes(parseInt(s.date.split('-')[1])));
-
-                    const p1Count = p1Shifts.length;
-                    const p2Count = p2Shifts.length;
-                    
-                    let growth = 0;
-                    if (p1Count > 0) growth = Math.round(((p2Count - p1Count) / p1Count) * 100);
-                    else if (p2Count > 0) growth = 100;
-
-                    const getDist = (list) => {
-                        const t = list.length || 1;
-                        const sl = list.filter(s => s.drawer === '雙連').length;
-                        const slin = list.filter(s => s.drawer === '士林').length;
-                        const sp = list.filter(s => s.drawer === '石牌').length;
-                        return `${Math.round(sl/t*100)} / ${Math.round(slin/t*100)} / ${Math.round(sp/t*100)}`;
-                    };
-
-                    // RENT Calculation (Renamed from Revenue)
-                    const calcRent = (count) => {
-                        let rate = 1;
-                        if (count >= 20) rate = 0.85; else if (count >= 10) rate = 0.9;
-                        return Math.round(count * 800 * rate);
-                    };
-
-                    const totalCount = p1Count + p2Count;
-                    let tier = 'gray';
-                    if (totalCount >= 20) tier = 'gold';
-                    else if (totalCount >= 10) tier = 'blue';
-
-                    return {
-                        name, p1Count, p2Count, growth, tier, isMerged: data.isMerged,
-                        p1Dist: getDist(p1Shifts), p2Dist: getDist(p2Shifts),
-                        p1Rent: calcRent(p1Count), p2Rent: calcRent(p2Count),
-                        totalRent: calcRent(p1Count + p2Count)
-                    };
-                }).sort((a,b) => b.p2Count - a.p2Count);
-            });
-
-            // My Schedule & Print
-            const uniqueStaffList = computed(() => vendorList.value.map(v => v.displayName).sort());
-            const allMonths = computed(() => [...new Set(schedules.value.map(s => s.date.substring(0, 7)))].sort());
-
-            const selectedMonthData = computed(() => {
-                if (!printTarget.value || printMonths.value.length === 0) return [];
-                
-                return printMonths.value.sort().map(mStr => {
-                    const [y, m] = mStr.split('-');
-                    const daysInMonth = new Date(y, m, 0).getDate();
-                    const firstDay = new Date(y, m - 1, 1).getDay(); 
-                    
-                    const days = [];
-                    for(let i=0; i<firstDay; i++) days.push({ dayNum: '', isCurrent: false });
-                    for(let i=1; i<=daysInMonth; i++) {
-                        const dStr = `${mStr}-${String(i).padStart(2,'0')}`;
-                        // Find shift by Display Name
-                        const shift = schedules.value.find(s => getDisplayStaff(s) === printTarget.value && s.date === dStr);
-                        days.push({ dayNum: i, isCurrent: true, dateStr: dStr, shift });
-                    }
-                    return { label: `${y}年 ${m}月`, days };
-                });
-            });
-
-            // Cloud / Local Storage
-            const saveToCloud = async () => {
-                await DataService.save('schedules', schedules.value);
-                await DataService.save('vendors', vendorList.value);
-                // console.log('Saved to local cloud mock');
-            };
-
-            const loadFromCloud = async () => {
-                const s = await DataService.load('schedules');
-                if (s) { 
-                    schedules.value = s; 
-                    showInput.value = false; 
-                }
-                const v = await DataService.load('vendors');
-                if (v) vendorList.value = v;
             };
 
             // Helpers
-            const getDrawerShiftCount = (drawer) => schedules.value.filter(s => s.drawer === drawer).length;
-            const getShifts = (date, drawer) => schedules.value.filter(s => s.date === date && s.drawer === drawer);
-            const truncateName = (name) => name.length > 3 ? name.substring(0, 3) + '..' : name;
+            const navClass = (v) => currentView.value === v ? 'bg-emerald-600 text-white shadow font-bold' : 'text-slate-400 hover:text-white';
+            const getPKColorClass = (vid) => { const idx = pkList.value.indexOf(vid); return idx !== -1 ? `pk-${idx}` : ''; };
+            const getDisplayStaff = (s) => s.rawStaff;
+            const truncateName = (n) => n.length > 4 ? n.substring(0,3)+'..' : n;
+            const getShifts = (d,k) => schedules.value.filter(s => s.date===d && s.drawer===k);
+            const getDrawerShiftCount = (k) => schedules.value.filter(s => s.drawer===k).length;
+            const handleSyncScroll = (e) => document.querySelectorAll('.sync-scroll-target').forEach(el => el.scrollTop = e.target.scrollTop);
             
-            const getComparisonColorClass = (staffName) => {
-                if (!staffName) return '';
-                const idx = compareList.value.indexOf(staffName);
-                if (idx === 0) return 'hl-red';
-                if (idx === 1) return 'hl-yellow';
-                if (idx === 2) return 'hl-green';
-                if (idx === 3) return 'hl-blue';
-                return '';
-            };
-            const getRowColor = (tier) => {
-                if (tier === 'gold') return 'bg-yellow-50/50';
-                if (tier === 'blue') return 'bg-blue-50/50';
-                return '';
-            };
-            const handleSyncScroll = (evt) => {
-                const scrollTop = evt.target.scrollTop;
-                document.querySelectorAll('.sync-scroll-target').forEach(el => {
-                    if (Math.abs(el.scrollTop - scrollTop) > 5) el.scrollTop = scrollTop;
+            // Reused Calendar/Matrix Logic
+            const calendarWeeks = computed(() => {
+                const dates = [...new Set(schedules.value.map(s => s.date))].sort();
+                if(!dates.length) return [];
+                const s = new Date(dates[0]); s.setDate(s.getDate()-(s.getDay()===0?6:s.getDay()-1));
+                const e = new Date(dates[dates.length-1]);
+                const weeks=[]; let c=new Date(s); let lm=-1;
+                while(c<=e) {
+                    const days=[]; let ml=''; let ims=false;
+                    for(let i=0;i<5;i++){
+                        const ds=c.toISOString().slice(0,10); const m=c.getMonth()+1;
+                        if(m!==lm && i===0){ml=`${c.getFullYear()}/${m}`; ims=true; lm=m;}
+                        days.push({dateStr:ds, dayNum:c.getDate(), weekday:['日','一','二','三','四','五','六'][c.getDay()], isToday:ds===new Date().toISOString().slice(0,10)});
+                        c.setDate(c.getDate()+1);
+                    }
+                    weeks.push({id:weeks.length, monthLabel:ml, isMonthStart:ims, days}); c.setDate(c.getDate()+2);
+                }
+                return weeks;
+            });
+            const matrixHeaders = computed(() => [...new Set(schedules.value.map(s => s.date))].sort().map(d => ({ simpleDate: d.substring(5).replace('-','/'), dayName: `(${new Date(d).toLocaleDateString('zh-TW',{weekday:'short'})})`, date: d })));
+            const matrixGroups = computed(() => {
+                const grps = [];
+                ['雙連','士林','石牌'].forEach(k => {
+                    const st = [...new Set(schedules.value.filter(s => s.drawer===k).map(s => s.station))];
+                    const rows = st.map(station => ({
+                        station, isShilin: k==='士林',
+                        cells: matrixHeaders.value.map(h => {
+                            const match = schedules.value.find(s => s.date === h.date && s.station === station);
+                            return match ? { name: match.rawStaff, status: match.status, vendorId: match.vendorId } : null;
+                        })
+                    }));
+                    if(rows.length) grps.push({name: k, rows, badgeClass: k==='士林'?'bg-emerald-500':k==='雙連'?'bg-blue-500':'bg-amber-500'});
+                });
+                return grps;
+            });
+            const drawers = [{key:'雙連',name:'雙連',colorClass:'bg-blue-500'},{key:'士林',name:'士林',colorClass:'bg-emerald-500'},{key:'石牌',name:'石牌',colorClass:'bg-amber-500'}];
+            const quickEditShift = (s) => {
+                Swal.fire({
+                    title: `${s.rawStaff} - ${s.date}`,
+                    input: 'number',
+                    inputValue: s.sales,
+                    text: '快速輸入業績',
+                    showDenyButton: true,
+                    denyButtonText: s.status==='active'?'改為請假':'改為出席',
+                    confirmButtonText: '儲存'
+                }).then(res => {
+                    if(res.isConfirmed) s.sales = parseInt(res.value)||0;
+                    else if(res.isDenied) s.status = s.status==='active'?'leave':'active';
+                    saveAll();
                 });
             };
-            const navClass = (view) => currentView.value === view ? 'bg-emerald-600 text-white shadow font-bold' : 'text-slate-400 hover:text-white';
-            const genQR = () => {
-                const c1 = document.getElementById("qrcode1");
-                const c2 = document.getElementById("qrcode2");
-                if (c1) { c1.innerHTML = ''; if (qrUrl1.value) new QRCode(c1, { text: qrUrl1.value, width: 64, height: 64 }); }
-                if (c2) { c2.innerHTML = ''; if (qrUrl2.value) new QRCode(c2, { text: qrUrl2.value, width: 64, height: 64 }); }
-            };
-            const printNow = () => window.print();
 
             onMounted(() => {
-                loadFromCloud();
-                nextTick(genQR);
+                const s = localStorage.getItem('v97_schedules');
+                const v = localStorage.getItem('v97_vendors');
+                if(s) schedules.value = JSON.parse(s);
+                if(v) vendorList.value = JSON.parse(v);
+                
+                if(!s) showInput.value = true;
+                else setDefaultTarget();
             });
 
             return {
-                csvInput, showInput, currentView, navClass,
-                drawers, calendarWeeks, getShifts, getDrawerShiftCount, truncateName, handleSyncScroll,
-                matrixHeaders, matrixGroups,
-                compareList, uniqueStaffList, getComparisonColorClass, 
-                analysisStats, getRowColor,
-                printTarget, printMonths, allMonths, contactInfo, qrUrl1, qrUrl2, selectedMonthData, genQR, printNow,
-                // New
-                vendorList, autoGenerateVendors, addNewVendor, addAlias, removeAlias, deleteVendor, getDisplayStaff,
-                processCSV, saveToCloud, openShiftDetail
+                currentView, showInput, showPKModal, csvInput,
+                navClass, processCSV, loadDemoData, saveAll,
+                pkList, getPKColorClass, sortedVendorOptions,
+                // Kanban/Matrix
+                drawers, calendarWeeks, getShifts, getDrawerShiftCount, truncateName, getDisplayStaff, quickEditShift,
+                matrixHeaders, matrixGroups, handleSyncScroll,
+                // Mobile Report
+                reportTargetId, vendorReportShifts, vendorReportStats, toggleLeave,
+                // Analysis
+                analysisStats
             };
         }
     }).mount('#app');
