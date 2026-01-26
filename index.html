@@ -2,158 +2,313 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>點點綠排班戰略系統 v9.7 (Mobile Bento)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>點點綠排班戰略系統 v9.9 (Admin Edition)</title>
     
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <style>
-        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f1f5f9; color: #334155; overflow: hidden; -webkit-tap-highlight-color: transparent; }
+        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f3f4f6; color: #1f2937; overflow: hidden; }
         .font-mono { font-family: 'JetBrains Mono', monospace; }
 
-        /* Custom Scrollbar */
-        .custom-scroll::-webkit-scrollbar { width: 4px; height: 4px; }
-        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
+        /* Bento UI Utilities */
+        .bento-card { background: white; border-radius: 1rem; border: 1px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0,0,0,0.05); overflow: hidden; display: flex; flex-direction: column; }
+        .bento-header { padding: 1rem; border-bottom: 1px solid #f3f4f6; font-weight: 700; color: #374151; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
 
-        /* Bento Grid Utilities */
-        .bento-card { background: white; border-radius: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; overflow: hidden; }
-        .bento-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1rem; border-radius: 1rem; transition: transform 0.1s; border: 1px solid #e2e8f0; background: white; color: #475569; }
-        .bento-btn:active { transform: scale(0.96); background: #f8fafc; }
-        .bento-btn.active { background: #ecfdf5; border-color: #10b981; color: #047857; font-weight: bold; }
+        /* Scrollbars */
+        .custom-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        
+        /* Matrix View (Fixed Scrolling) */
+        .matrix-table { border-collapse: separate; border-spacing: 0; font-size: 0.75rem; }
+        .matrix-table th, .matrix-table td { border-right: 1px solid #f3f4f6; border-bottom: 1px solid #f3f4f6; padding: 6px 8px; white-space: nowrap; text-align: center; height: 36px; }
+        .matrix-table thead th { background-color: #f9fafb; position: sticky; top: 0; z-index: 20; font-weight: 700; color: #4b5563; border-bottom: 2px solid #e5e7eb; }
+        .matrix-table td:first-child { position: sticky; left: 0; background-color: #fff; z-index: 30; font-weight: 700; text-align: left; border-right: 2px solid #9ca3af; color: #111827; }
+        .matrix-table th:first-child { position: sticky; left: 0; top: 0; z-index: 40; background-color: #f3f4f6; border-right: 2px solid #9ca3af; border-bottom: 2px solid #e5e7eb; }
+        
+        /* Visuals */
+        .shilin-bg { background-color: #ecfdf5 !important; }
+        .station-divider { border-top: 2px solid #4b5563 !important; }
 
-        /* Shift Card */
-        .shift-card { font-size: 0.75rem; padding: 6px 8px; margin-bottom: 4px; background: white; border-radius: 8px; border-left: 4px solid #cbd5e1; box-shadow: 0 1px 2px rgba(0,0,0,0.05); cursor: pointer; transition: all 0.1s; position: relative; }
-        .shift-card:active { transform: scale(0.98); }
+        /* Kanban */
+        .kanban-col { flex: 1; min-width: 300px; background: #f9fafb; border-radius: 1rem; display: flex; flex-direction: column; overflow: hidden; border: 1px solid #e5e7eb; }
+        .shift-card { font-size: 0.75rem; padding: 6px 10px; margin-bottom: 6px; background: white; border-radius: 0.5rem; border-left: 4px solid #cbd5e1; box-shadow: 0 1px 2px rgba(0,0,0,0.05); cursor: pointer; transition: all 0.2s; position: relative; }
+        .shift-card:hover { transform: translateY(-2px); box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         .shift-leave { opacity: 0.6; text-decoration: line-through; background-color: #fef2f2; border-left-color: #ef4444; }
         .shift-has-sales { border-right: 4px solid #f59e0b; }
 
         /* PK Colors */
-        .pk-0 { border-left-color: #ef4444 !important; background-color: #fef2f2 !important; } 
-        .pk-1 { border-left-color: #f59e0b !important; background-color: #fffbeb !important; }
-        .pk-2 { border-left-color: #22c55e !important; background-color: #f0fdf4 !important; }
-        .pk-3 { border-left-color: #3b82f6 !important; background-color: #eff6ff !important; }
+        .pk-0 { background-color: #fef2f2 !important; color: #b91c1c; border-left-color: #ef4444 !important; } 
+        .pk-1 { background-color: #fffbeb !important; color: #92400e; border-left-color: #f59e0b !important; } 
+        .pk-2 { background-color: #f0fdf4 !important; color: #166534; border-left-color: #22c55e !important; } 
+        .pk-3 { background-color: #eff6ff !important; color: #1e40af; border-left-color: #3b82f6 !important; } 
+        .pk-4 { background-color: #faf5ff !important; color: #6b21a8; border-left-color: #a855f7 !important; } 
+        .pk-5 { background-color: #fdf2f8 !important; color: #9d174d; border-left-color: #ec4899 !important; } 
+        .pk-6 { background-color: #ecfeff !important; color: #0e7490; border-left-color: #06b6d4 !important; } 
+        .pk-7 { background-color: #f7fee7 !important; color: #3f6212; border-left-color: #84cc16 !important; } 
 
-        /* Matrix Table */
-        .matrix-table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 0.75rem; }
-        .matrix-table th, .matrix-table td { border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; padding: 4px; white-space: nowrap; text-align: center; height: 36px; }
-        .matrix-table thead th { background-color: #f8fafc; position: sticky; top: 0; z-index: 20; font-weight: 700; color: #475569; }
-        .matrix-table td:first-child { position: sticky; left: 0; background-color: #fff; z-index: 30; font-weight: 700; text-align: left; border-right: 2px solid #64748b; }
-        
-        /* Modal Animations */
-        .slide-up-enter-active, .slide-up-leave-active { transition: transform 0.3s ease-out; }
-        .slide-up-enter-from, .slide-up-leave-to { transform: translateY(100%); }
-        .fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }
-        .fade-enter-from, .fade-leave-to { opacity: 0; }
+        /* Mobile Nav Transition */
+        .slide-enter-active, .slide-leave-active { transition: transform 0.3s ease; }
+        .slide-enter-from, .slide-leave-to { transform: translateX(100%); }
 
         [v-cloak] { display: none; }
     </style>
 </head>
 <body>
 
-<div id="app" v-cloak class="h-screen flex flex-col bg-slate-100">
+<div id="app" v-cloak class="h-screen flex flex-col">
 
-    <header class="h-14 bg-white shadow-sm flex items-center justify-between px-4 z-50 shrink-0 border-b border-slate-200">
-        <div class="flex items-center gap-2">
-            <div class="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center text-white font-bold shadow-sm shadow-emerald-200">9.7</div>
-            <h1 class="font-bold text-slate-800">點點綠排班 <span class="text-[10px] text-slate-400 font-normal">Bento</span></h1>
-        </div>
-        
+    <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 lg:px-6 shadow-sm z-50 shrink-0">
         <div class="flex items-center gap-3">
-             <button @click="openReportingModal" class="bg-indigo-600 text-white w-8 h-8 rounded-full flex items-center justify-center shadow-lg shadow-indigo-200 active:scale-90 transition">
-                <i class="fa-solid fa-pen"></i>
+            <div class="w-9 h-9 bg-gradient-to-br from-indigo-600 to-purple-700 rounded-lg flex items-center justify-center font-bold text-white shadow-md">
+                v9.9
+            </div>
+            <div>
+                <h1 class="font-bold text-lg text-gray-800 leading-tight">點點綠排班</h1>
+                <div class="text-[10px] text-gray-400 font-medium">Admin Edition</div>
+            </div>
+        </div>
+
+        <div class="hidden md:flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
+            <button v-for="item in navItems" :key="item.key" @click="currentView=item.key" 
+                :class="currentView===item.key ? 'bg-white text-indigo-600 shadow-sm font-bold' : 'text-gray-500 hover:text-gray-700'"
+                class="px-4 py-1.5 text-xs rounded-lg transition-all">
+                <i :class="item.icon" class="mr-1"></i> {{ item.label }}
+            </button>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <div class="hidden md:flex items-center gap-2 text-xs px-3 py-1 bg-gray-50 rounded-full border border-gray-100">
+                <div class="w-2 h-2 rounded-full" :class="isSaving ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'"></div>
+                <span class="text-gray-500">{{ isSaving ? '同步中...' : '已同步' }}</span>
+            </div>
+
+            <button @click="openPerformanceModal" class="hidden md:flex bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 rounded-lg text-xs font-bold shadow-sm transition items-center gap-1">
+                <i class="fa-solid fa-file-invoice-dollar"></i> 業績回報
+            </button>
+            
+            <button @click="showPKModal = true" class="relative bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 rounded-lg text-xs font-bold shadow-sm transition items-center gap-1 hidden md:flex">
+                <i class="fa-solid fa-people-arrows"></i> PK
+                <span v-if="pkList.length > 0" class="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center">{{pkList.length}}</span>
             </button>
 
-            <button @click="showMobileMenu = true" class="text-slate-600 p-1 active:text-slate-900">
+            <button @click="mobileMenuOpen = !mobileMenuOpen" class="md:hidden text-gray-600 p-2 rounded-lg hover:bg-gray-100">
                 <i class="fa-solid fa-bars text-xl"></i>
             </button>
         </div>
     </header>
 
-    <transition name="fade">
-        <div v-if="showMobileMenu" class="fixed inset-0 bg-slate-900/60 z-[60] backdrop-blur-sm" @click.self="showMobileMenu = false">
-            <div class="absolute right-0 top-0 bottom-0 w-64 bg-slate-50 shadow-2xl p-4 flex flex-col gap-4">
-                <div class="flex justify-between items-center mb-2">
-                    <h2 class="font-bold text-slate-700">功能選單</h2>
-                    <button @click="showMobileMenu = false" class="w-8 h-8 bg-white rounded-full text-slate-400 shadow"><i class="fa-solid fa-times"></i></button>
-                </div>
-                
-                <div class="grid grid-cols-2 gap-3">
-                    <button @click="navTo('kanban')" class="bento-btn" :class="{active: currentView==='kanban'}">
-                        <i class="fa-solid fa-columns text-xl mb-2 text-blue-500"></i>
-                        <span class="text-xs">看板</span>
-                    </button>
-                    <button @click="navTo('matrix')" class="bento-btn" :class="{active: currentView==='matrix'}">
-                        <i class="fa-solid fa-table-cells text-xl mb-2 text-emerald-500"></i>
-                        <span class="text-xs">總表</span>
-                    </button>
-                    <button @click="navTo('analysis')" class="bento-btn" :class="{active: currentView==='analysis'}">
-                        <i class="fa-solid fa-chart-line text-xl mb-2 text-amber-500"></i>
-                        <span class="text-xs">分析</span>
-                    </button>
-                    <button @click="navTo('vendor')" class="bento-btn" :class="{active: currentView==='vendor'}">
-                        <i class="fa-solid fa-store text-xl mb-2 text-purple-500"></i>
-                        <span class="text-xs">廠商</span>
-                    </button>
-                </div>
-
-                <div class="bento-card p-3 mt-auto">
-                    <div class="text-xs font-bold text-slate-500 mb-2">資料同步</div>
-                    <div class="flex items-center gap-2 text-xs mb-3">
-                        <div class="w-2 h-2 rounded-full" :class="isSaving ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'"></div>
-                        <span>{{ isSaving ? '同步中...' : '已同步至雲端' }}</span>
-                    </div>
-                    <button @click="showInput = true" class="w-full bg-slate-200 text-slate-600 text-xs py-2 rounded">
-                        <i class="fa-solid fa-file-import"></i> 匯入 CSV
-                    </button>
-                </div>
+    <transition name="slide">
+        <div v-if="mobileMenuOpen" class="fixed inset-y-0 right-0 w-64 bg-white shadow-2xl z-[60] md:hidden flex flex-col">
+            <div class="p-4 border-b flex justify-between items-center">
+                <span class="font-bold text-gray-800">功能選單</span>
+                <button @click="mobileMenuOpen = false" class="text-gray-400"><i class="fa-solid fa-times text-lg"></i></button>
+            </div>
+            <div class="p-2 flex-grow overflow-y-auto">
+                <button v-for="item in navItems" :key="item.key" @click="currentView=item.key; mobileMenuOpen=false" 
+                    class="w-full text-left px-4 py-3 text-sm rounded-lg mb-1"
+                    :class="currentView===item.key ? 'bg-indigo-50 text-indigo-600 font-bold' : 'text-gray-600 hover:bg-gray-50'">
+                    <i :class="item.icon" class="mr-2 w-5"></i> {{ item.label }}
+                </button>
+                <hr class="my-2 border-gray-100">
+                <button @click="openPerformanceModal; mobileMenuOpen=false" class="w-full text-left px-4 py-3 text-sm rounded-lg text-emerald-600 font-bold hover:bg-emerald-50">
+                    <i class="fa-solid fa-file-invoice-dollar mr-2 w-5"></i> 業績回報中心
+                </button>
+                <button @click="showPKModal=true; mobileMenuOpen=false" class="w-full text-left px-4 py-3 text-sm rounded-lg text-indigo-600 font-bold hover:bg-indigo-50">
+                    <i class="fa-solid fa-people-arrows mr-2 w-5"></i> PK 戰情室
+                </button>
+                <button @click="showInput=true; mobileMenuOpen=false" class="w-full text-left px-4 py-3 text-sm rounded-lg text-gray-500 hover:bg-gray-50">
+                    <i class="fa-solid fa-file-import mr-2 w-5"></i> 匯入 CSV
+                </button>
             </div>
         </div>
     </transition>
 
-    <main class="flex-grow overflow-hidden relative">
-        
-        <div v-if="currentView === 'kanban'" class="h-full flex flex-col">
-            <div class="bg-white px-4 py-2 flex items-center gap-2 overflow-x-auto border-b shrink-0 h-12 no-scrollbar">
-                <button @click="showPKModal = true" class="bg-slate-800 text-white text-xs px-3 py-1 rounded-full whitespace-nowrap shadow">
-                    <i class="fa-solid fa-people-arrows"></i> PK戰情 ({{pkList.length}})
-                </button>
-                <div v-for="vid in pkList" :key="vid" class="text-[10px] px-2 py-0.5 rounded-full border bg-white whitespace-nowrap flex items-center gap-1" :class="'pk-'+pkList.indexOf(vid)">
-                    {{ getVendorName(vid) }}
-                    <i @click.stop="togglePK(vid)" class="fa-solid fa-times text-slate-400 ml-1"></i>
+    <main class="flex-grow p-3 md:p-6 overflow-hidden relative">
+
+        <div v-if="currentView === 'kanban'" class="h-full flex gap-3 overflow-x-auto pb-2">
+            <div v-for="drawer in drawers" :key="drawer.key" class="kanban-col shadow-sm flex-shrink-0" style="width: 320px;">
+                <div class="p-3 border-b bg-white flex justify-between items-center sticky top-0 z-10">
+                    <div class="flex items-center gap-2"><div class="w-1.5 h-6 rounded-full" :class="drawer.colorClass"></div><span class="font-bold text-gray-700">{{ drawer.name }}區</span></div>
+                    <div class="text-[10px] text-gray-400 bg-gray-50 border rounded px-1.5 py-0.5">{{ getDrawerShiftCount(drawer.key) }}場</div>
+                </div>
+                <div class="overflow-y-auto custom-scroll flex-grow p-2 sync-scroll-target" @scroll="handleSyncScroll">
+                    <div v-for="week in calendarWeeks" :key="week.id" class="mb-3">
+                        <div v-if="week.isMonthStart" class="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2 pl-1">{{ week.monthLabel }}</div>
+                        <div class="grid grid-cols-5 gap-1.5">
+                            <div v-for="day in week.days" :key="day.dateStr" class="min-h-[80px] bg-white border border-gray-200 rounded-lg p-1.5 flex flex-col relative group hover:border-indigo-300 transition-colors">
+                                <div class="text-[10px] text-gray-400 mb-1 flex justify-between border-b border-gray-100 pb-1">
+                                    <span :class="{'text-indigo-600 font-bold bg-indigo-50 px-1 rounded': day.isToday}">{{ day.dayNum }}</span>
+                                    <span>{{ day.weekday }}</span>
+                                </div>
+                                <div v-for="shift in getShifts(day.dateStr, drawer.key)" :key="shift.id" 
+                                     class="shift-card" 
+                                     :class="[getPKColorClass(shift.vendorId), shift.status === 'leave' ? 'shift-leave' : '', shift.sales > 0 ? 'shift-has-sales' : '']" 
+                                     @click="openShiftDetail(shift)">
+                                    <div class="font-bold truncate leading-tight">{{ truncateName(getDisplayStaff(shift)) }}</div>
+                                    <div v-if="shift.sales > 0" class="text-[9px] text-amber-600 font-mono mt-0.5">${{shift.sales.toLocaleString()}}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="h-10"></div>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="currentView === 'matrix'" class="bento-card h-full">
+            <div class="bento-header bg-gray-50">
+                <span>總表排程</span>
+                <span class="text-xs text-gray-400">Shift + 滾輪可橫向捲動</span>
+            </div>
+            <div class="overflow-auto custom-scroll flex-grow relative bg-white w-full">
+                <table class="matrix-table min-w-max w-full">
+                    <thead>
+                        <tr>
+                            <th class="w-32 bg-gray-50 shadow-sm">站名 \ 日期</th>
+                            <th v-for="header in matrixHeaders" :key="header.date" class="min-w-[40px]">
+                                <div class="font-bold text-gray-600">{{ header.simpleDate }}</div>
+                                <div class="text-[9px] font-normal text-gray-400">{{ header.dayName }}</div>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template v-for="(group, gIndex) in matrixGroups" :key="group.name">
+                            <tr v-for="(row, rIndex) in group.rows" :key="row.station" 
+                                :class="[gIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50', rIndex === 0 && gIndex !== 0 ? 'station-divider' : '', row.isShilin ? 'shilin-bg' : '']">
+                                <td class="shadow-sm">
+                                    <div class="flex items-center justify-between">
+                                        <span>{{ row.station }}</span>
+                                        <span v-if="rIndex === 0" class="text-[9px] px-1.5 rounded-full text-white font-bold" :class="group.badgeClass">{{ group.name }}</span>
+                                    </div>
+                                </td>
+                                <td v-for="(cell, i) in row.cells" :key="i" :class="getPKColorClass(cell?.vendorId)" @click="cell?.shift ? openShiftDetail(cell.shift) : null" class="cursor-pointer hover:bg-gray-100 transition-colors">
+                                    <span :class="{'line-through text-gray-300': cell?.status === 'leave'}">{{ cell?.name }}</span>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div v-if="currentView === 'analysis'" class="h-full flex flex-col gap-4 overflow-hidden">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 shrink-0">
+                <div class="bento-card p-4 bg-slate-800 text-white flex flex-col justify-between">
+                    <div class="text-xs text-slate-400 mb-1">P1 (11-1月) 預估租金成本</div>
+                    <div class="text-2xl font-bold font-mono text-emerald-400">${{ financialSummary.p1Total.toLocaleString() }}</div>
+                </div>
+                <div class="bento-card p-4 bg-slate-800 text-white flex flex-col justify-between">
+                    <div class="text-xs text-slate-400 mb-1">P2 (2-4月) 預估租金成本</div>
+                    <div class="text-2xl font-bold font-mono text-emerald-400">${{ financialSummary.p2Total.toLocaleString() }}</div>
+                </div>
+                <div class="bento-card p-4 bg-slate-700 text-white flex items-center justify-between">
+                    <div>
+                        <div class="text-xs text-slate-400 mb-1">成本成長率</div>
+                        <div class="text-3xl font-bold" :class="financialSummary.growth >= 0 ? 'text-green-400' : 'text-red-400'">
+                            {{ financialSummary.growth > 0 ? '+' : ''}}{{ financialSummary.growth }}%
+                        </div>
+                    </div>
+                    <div class="text-right text-[10px] text-slate-400 leading-tight">
+                        P1 vs P2<br>租金規則:<br>20場(85折)<br>10場(9折)
+                    </div>
                 </div>
             </div>
 
-            <div class="flex-grow flex gap-2 overflow-x-auto p-2 bg-slate-100 snap-x">
-                <div v-for="drawer in drawers" :key="drawer.key" class="min-w-[85vw] md:min-w-[300px] flex flex-col bg-slate-50 rounded-xl border snap-center">
-                    <div class="p-3 border-b flex justify-between items-center bg-white rounded-t-xl sticky top-0 z-10">
-                        <span class="font-bold border-l-4 pl-2" :class="drawer.borderColor">{{ drawer.name }}區</span>
-                        <span class="text-xs bg-slate-100 px-2 py-1 rounded-full text-slate-500">{{ getDrawerShiftCount(drawer.key) }}場</span>
+            <div class="flex-grow flex flex-col md:flex-row gap-4 overflow-hidden">
+                <div class="flex-grow bento-card flex flex-col overflow-hidden">
+                    <div class="bento-header bg-gray-50">
+                        <span>廠商出席與租金分析</span>
+                        <div class="text-xs text-gray-400 font-normal">依報名熱度排序</div>
                     </div>
-                    <div class="overflow-y-auto p-2 flex-grow custom-scroll">
-                        <div v-for="week in calendarWeeks" :key="week.id" class="mb-2">
-                            <div v-if="week.isMonthStart" class="text-xs font-bold text-slate-500 my-2 text-center bg-slate-200/50 py-1 rounded">{{ week.monthLabel }}</div>
-                            <div class="grid grid-cols-1 gap-1">
-                                <div v-for="day in week.days" :key="day.dateStr" class="bg-white p-2 rounded-lg border border-slate-100">
-                                    <div class="flex justify-between text-xs text-slate-400 mb-1">
-                                        <span :class="{'text-emerald-600 font-bold': day.isToday}">{{ day.dateStr.slice(5) }} ({{ day.weekday }})</span>
-                                    </div>
-                                    <div v-if="getShifts(day.dateStr, drawer.key).length === 0" class="text-[10px] text-slate-300 text-center py-1">- 空檔 -</div>
-                                    <div v-for="shift in getShifts(day.dateStr, drawer.key)" :key="shift.id" 
-                                         class="shift-card flex justify-between items-center" 
-                                         :class="[getPKColorClass(shift.vendorId), shift.status === 'leave' ? 'shift-leave' : '']"
-                                         @click="openShiftEdit(shift)">
-                                        <div>
-                                            <div class="font-bold text-slate-700">{{ getVendorName(shift.vendorId) }}</div>
-                                            <div v-if="shift.timeAdjustment" class="text-[9px] text-purple-500">{{ shift.timeAdjustment }}</div>
+                    <div class="overflow-auto custom-scroll flex-grow p-0">
+                        <table class="w-full text-xs text-left border-collapse">
+                            <thead class="bg-gray-100 sticky top-0 text-gray-500 uppercase z-10 font-bold">
+                                <tr>
+                                    <th class="px-3 py-2">廠商 (類別)</th>
+                                    <th class="px-3 py-2 text-center border-l">P1 場次/佔比</th>
+                                    <th class="px-3 py-2 text-right">P1 租金</th>
+                                    <th class="px-3 py-2 text-center border-l">P2 場次/佔比</th>
+                                    <th class="px-3 py-2 text-right">P2 租金</th>
+                                    <th class="px-3 py-2 text-center border-l">成長</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100">
+                                <tr v-for="stat in analysisStats" :key="stat.name" class="hover:bg-gray-50">
+                                    <td class="px-3 py-2">
+                                        <div class="font-bold text-gray-700">{{ stat.name }}</div>
+                                        <div class="text-[9px] text-gray-400">{{ stat.category || '未分類' }}</div>
+                                    </td>
+                                    <td class="px-3 py-2 border-l">
+                                        <div class="flex justify-between items-center mb-1">
+                                            <span class="font-bold">{{ stat.p1Count }}場</span>
+                                            <span v-if="stat.p1Rent.discount < 1" class="text-[9px] px-1 rounded text-white" :class="stat.p1Rent.discount===0.85?'bg-green-500':'bg-blue-400'">{{stat.p1Rent.discount===0.85?'85':'90'}}折</span>
                                         </div>
-                                        <div v-if="shift.sales > 0" class="text-xs font-mono font-bold text-amber-600">${{ shift.sales }}</div>
-                                    </div>
+                                        <div class="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden flex">
+                                            <div class="bg-blue-400 h-full" :style="{width: stat.p1Dist.sl+'%'}"></div>
+                                            <div class="bg-emerald-400 h-full" :style="{width: stat.p1Dist.slin+'%'}"></div>
+                                            <div class="bg-amber-400 h-full" :style="{width: stat.p1Dist.sp+'%'}"></div>
+                                        </div>
+                                    </td>
+                                    <td class="px-3 py-2 text-right font-mono text-gray-600">
+                                        ${{ stat.p1Rent.total.toLocaleString() }}
+                                    </td>
+                                    <td class="px-3 py-2 border-l">
+                                        <div class="flex justify-between items-center mb-1">
+                                            <span class="font-bold">{{ stat.p2Count }}場</span>
+                                            <span v-if="stat.p2Rent.discount < 1" class="text-[9px] px-1 rounded text-white" :class="stat.p2Rent.discount===0.85?'bg-green-500':'bg-blue-400'">{{stat.p2Rent.discount===0.85?'85':'90'}}折</span>
+                                        </div>
+                                        <div class="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden flex">
+                                            <div class="bg-blue-400 h-full" :style="{width: stat.p2Dist.sl+'%'}"></div>
+                                            <div class="bg-emerald-400 h-full" :style="{width: stat.p2Dist.slin+'%'}"></div>
+                                            <div class="bg-amber-400 h-full" :style="{width: stat.p2Dist.sp+'%'}"></div>
+                                        </div>
+                                    </td>
+                                    <td class="px-3 py-2 text-right font-mono text-gray-600">
+                                        ${{ stat.p2Rent.total.toLocaleString() }}
+                                    </td>
+                                    <td class="px-3 py-2 text-center border-l">
+                                        <span :class="stat.growth >= 0 ? 'text-green-600' : 'text-red-500'">{{ stat.growth }}%</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="w-full md:w-80 flex flex-col gap-4 shrink-0">
+                    <div class="bento-card p-3">
+                        <h4 class="font-bold text-gray-700 text-sm mb-3 border-b pb-2">各站點熱門廠商 Top 3</h4>
+                        <div v-for="st in platformInsights.stations" :key="st.name" class="mb-3">
+                            <div class="flex items-center gap-2 mb-1">
+                                <div class="w-2 h-2 rounded-full" :class="st.color"></div>
+                                <span class="text-xs font-bold">{{ st.name }}區</span>
+                            </div>
+                            <div class="space-y-1">
+                                <div v-for="(v, i) in st.top3" :key="i" class="flex justify-between text-[10px] text-gray-600 bg-gray-50 px-2 py-1 rounded">
+                                    <span>{{ i+1 }}. {{ v.name }}</span>
+                                    <span class="font-mono">{{ v.count }}場</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bento-card p-3 flex-grow">
+                        <h4 class="font-bold text-gray-700 text-sm mb-3 border-b pb-2">類別平衡 (Category)</h4>
+                        <div class="space-y-3">
+                            <div v-for="cat in platformInsights.categories" :key="cat.name" class="text-xs">
+                                <div class="flex justify-between mb-1">
+                                    <span>{{ cat.name }}</span>
+                                    <span class="text-gray-400">{{ cat.count }}場 ({{ cat.pct }}%)</span>
+                                </div>
+                                <div class="w-full bg-gray-100 rounded-full h-2">
+                                    <div class="bg-indigo-500 h-2 rounded-full" :style="{width: cat.pct + '%'}"></div>
                                 </div>
                             </div>
                         </div>
@@ -162,151 +317,199 @@
             </div>
         </div>
 
-        <div v-if="currentView === 'analysis'" class="h-full overflow-y-auto p-4 custom-scroll">
-            <div class="bento-card p-4 mb-4 bg-gradient-to-br from-slate-800 to-slate-700 text-white">
-                <h3 class="font-bold mb-2">P1 vs P2 租金總覽</h3>
-                <div class="grid grid-cols-2 gap-4 text-center">
-                    <div>
-                        <div class="text-xs text-slate-300">P1 (11-1月)</div>
-                        <div class="text-xl font-mono font-bold text-emerald-300">${{ financialSummary.p1Total.toLocaleString() }}</div>
-                    </div>
-                    <div>
-                        <div class="text-xs text-slate-300">P2 (2-4月)</div>
-                        <div class="text-xl font-mono font-bold text-emerald-300">${{ financialSummary.p2Total.toLocaleString() }}</div>
-                    </div>
+        <div v-if="currentView === 'vendor'" class="bento-card h-full p-4 flex flex-col">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-2">
+                <div class="flex items-center gap-2">
+                    <h3 class="font-bold text-gray-800 text-lg">廠商資料庫</h3>
+                    <span class="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-500">{{ vendorList.length }} 家</span>
                 </div>
-                <div class="mt-3 pt-2 border-t border-slate-600 text-center text-xs text-slate-400">
-                    成長率 <span :class="financialSummary.growth>=0?'text-green-400':'text-red-400'">{{ financialSummary.growth }}%</span>
+                
+                <div class="flex gap-2 w-full md:w-auto">
+                    <div class="relative flex-grow md:flex-grow-0">
+                        <i class="fa-solid fa-search absolute left-2 top-2 text-gray-400 text-xs"></i>
+                        <input v-model="vendorSearch" type="text" placeholder="搜尋廠商..." class="pl-7 pr-3 py-1.5 text-xs border rounded-lg bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none w-full md:w-48 transition-all">
+                    </div>
+                    <button @click="addNewVendor" class="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-500 transition shadow-sm whitespace-nowrap">
+                        <i class="fa-solid fa-plus mr-1"></i> 新增
+                    </button>
                 </div>
             </div>
+            
+            <div class="overflow-auto custom-scroll flex-grow">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-2">
+                    <div v-for="v in filteredVendors" :key="v.id" class="border rounded-xl p-3 bg-white hover:shadow-md transition-shadow relative group">
+                        <div class="flex justify-between items-start mb-2">
+                            <input v-model="v.displayName" class="font-bold text-gray-800 border-b border-transparent hover:border-gray-300 focus:border-indigo-500 outline-none w-full mr-2 text-sm transition-colors">
+                            <button @click="simulateVendorLogin(v)" class="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-1 rounded hover:bg-indigo-100 transition whitespace-nowrap" title="模擬登入回報介面">
+                                <i class="fa-solid fa-user-clock mr-1"></i>回報模式
+                            </button>
+                        </div>
+                        
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-[10px] text-gray-400">總場次: {{ getShiftCount(v.id) }}</span>
+                            <select v-model="v.category" class="text-[10px] border rounded p-1 bg-gray-50 outline-none w-1/2">
+                                <option value="">選擇類別...</option>
+                                <option value="農產">🥦 農產蔬果</option>
+                                <option value="烘焙">🍞 烘焙甜點</option>
+                                <option value="加工">🥫 加工食品</option>
+                                <option value="養殖">🥚 畜牧養殖</option>
+                                <option value="文創">🎨 文創手作</option>
+                            </select>
+                        </div>
 
-            <div class="bento-card overflow-hidden">
-                <div class="overflow-x-auto">
-                    <table class="w-full text-xs text-left">
-                        <thead class="bg-slate-50 text-slate-500 border-b">
-                            <tr>
-                                <th class="p-3 whitespace-nowrap">廠商名稱</th>
-                                <th class="p-3 text-center whitespace-nowrap">P1/P2 場次</th>
-                                <th class="p-3 text-center whitespace-nowrap">站點佔比 (雙/士/石)</th>
-                                <th class="p-3 text-right whitespace-nowrap">總租金預估</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100">
-                            <tr v-for="row in analysisStats" :key="row.name">
-                                <td class="p-3 font-bold text-slate-700">{{ row.name }}</td>
-                                <td class="p-3 text-center">
-                                    <span class="text-slate-400">{{ row.p1Count }}</span> / <span class="font-bold">{{ row.p2Count }}</span>
-                                </td>
-                                <td class="p-3 text-center font-mono text-[10px] text-slate-500">
-                                    {{ row.distStr }}
-                                </td>
-                                <td class="p-3 text-right font-mono font-bold text-emerald-600">
-                                    ${{ (row.p1Rent.total + row.p2Rent.total).toLocaleString() }}
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                        <div class="bg-gray-50 rounded-lg p-2 min-h-[40px]">
+                            <div class="text-[9px] text-gray-400 mb-1">CSV 原始名稱 (別名)</div>
+                            <div class="flex flex-wrap gap-1">
+                                 <span v-for="a in v.aliases" :key="a" class="text-[10px] bg-white border px-1.5 rounded flex items-center shadow-sm">
+                                    {{a}} <button @click="removeAlias(v,a)" class="ml-1 text-gray-300 hover:text-red-500">×</button>
+                                 </span>
+                                 <button @click="addAlias(v)" class="text-[10px] bg-gray-200 hover:bg-gray-300 text-gray-600 px-1.5 rounded transition">+</button>
+                            </div>
+                        </div>
+                        
+                        <button @click="deleteVendor(v.id)" class="absolute bottom-2 right-2 text-gray-200 hover:text-red-500 transition p-1" title="刪除廠商">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </div>
+                </div>
+                <div v-if="filteredVendors.length === 0" class="text-center text-gray-400 py-10">
+                    找不到符合的廠商
                 </div>
             </div>
         </div>
-
-        <div v-if="currentView === 'matrix'" class="h-full overflow-auto bg-white">
-            <table class="matrix-table">
-                <thead>
-                    <tr>
-                        <th class="w-24 bg-slate-50">站點</th>
-                        <th v-for="h in matrixHeaders" :key="h.date" class="min-w-[40px]">{{ h.simpleDate }}</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="row in matrixRows" :key="row.key">
-                        <td class="text-xs">{{ row.station }}</td>
-                        <td v-for="cell in row.cells" :key="cell.date" 
-                            :class="getPKColorClass(cell?.vendorId)"
-                            class="text-[10px]"
-                            @click="cell?.shift && openShiftEdit(cell.shift)">
-                            {{ cell ? truncateName(cell.name) : '' }}
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
-        <div v-if="currentView === 'vendor'" class="h-full overflow-y-auto p-4 custom-scroll">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="font-bold text-slate-700">廠商列表</h3>
-                <button @click="addNewVendor" class="text-xs bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full font-bold">新增</button>
-            </div>
-            <div class="grid gap-3">
-                <div v-for="v in sortedVendorList" :key="v.id" class="bento-card p-3 flex justify-between items-center">
-                    <div>
-                        <div class="font-bold text-slate-800">{{ v.displayName }}</div>
-                        <div class="text-[10px] text-slate-400">{{ v.aliases.length }} 個原始別名</div>
+        
+        <div v-if="currentView === 'settings'" class="bento-card h-full p-6 overflow-auto custom-scroll">
+            <h2 class="text-xl font-bold mb-4 text-gray-800">系統與資料設定</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="border border-indigo-100 bg-indigo-50/50 p-5 rounded-xl">
+                    <h3 class="font-bold text-indigo-800 mb-3 flex items-center">
+                        <i class="fa-solid fa-calendar-plus mr-2"></i>手動補登排班 (新增卡片)
+                    </h3>
+                    <div class="space-y-3 bg-white p-4 rounded-lg shadow-sm border border-indigo-100">
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 mb-1">日期</label>
+                                <input type="date" v-model="manualShift.date" class="w-full text-sm border rounded p-2 focus:ring-2 focus:ring-indigo-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 mb-1">區域</label>
+                                <select v-model="manualShift.drawer" class="w-full text-sm border rounded p-2 focus:ring-2 focus:ring-indigo-500 outline-none">
+                                    <option v-for="d in drawers" :key="d.key" :value="d.key">{{ d.name }}</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 mb-1">站點名稱 (如: 雙連1號)</label>
+                            <input type="text" v-model="manualShift.station" placeholder="輸入站點名稱" class="w-full text-sm border rounded p-2 focus:ring-2 focus:ring-indigo-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 mb-1">廠商</label>
+                            <select v-model="manualShift.vendorId" class="w-full text-sm border rounded p-2 focus:ring-2 focus:ring-indigo-500 outline-none">
+                                <option value="">請選擇廠商...</option>
+                                <option v-for="v in sortedVendors" :key="v.id" :value="v.id">{{ v.displayName }}</option>
+                            </select>
+                        </div>
+                        <button @click="addManualShift" class="w-full bg-indigo-600 text-white py-2 rounded-lg font-bold shadow hover:bg-indigo-700 transition">
+                            <i class="fa-solid fa-plus-circle mr-1"></i> 加入排班
+                        </button>
                     </div>
-                    <button @click="editVendor(v)" class="text-slate-300 p-2"><i class="fa-solid fa-chevron-right"></i></button>
+                </div>
+
+                <div class="flex flex-col gap-4">
+                    <div class="border p-4 rounded-xl">
+                        <h3 class="font-bold text-gray-700 mb-2"><i class="fa-solid fa-file-import mr-2"></i>資料匯入</h3>
+                        <p class="text-xs text-gray-400 mb-3">從 Excel/CSV 複製貼上原始排班資料以覆蓋現有資料。</p>
+                        <button @click="showInput=true" class="bg-gray-100 text-gray-600 px-4 py-2 rounded-lg text-sm font-bold hover:bg-gray-200 transition w-full">
+                            重新匯入原始 CSV
+                        </button>
+                    </div>
+
+                    <div class="border border-emerald-100 bg-emerald-50/30 p-4 rounded-xl flex-grow flex flex-col">
+                        <h3 class="font-bold text-emerald-800 mb-2"><i class="fa-solid fa-file-export mr-2"></i>匯出系統資料</h3>
+                        <p class="text-xs text-gray-400 mb-3">將目前所有修改後的排班、業績與狀態匯出為 CSV。</p>
+                        
+                        <textarea readonly v-model="exportText" class="w-full flex-grow p-2 text-[10px] font-mono border rounded mb-2 bg-white h-24 focus:outline-none" placeholder="點擊下方按鈕生成 CSV..."></textarea>
+                        
+                        <div class="flex gap-2">
+                            <button @click="generateExport" class="flex-1 bg-emerald-600 text-white py-2 rounded-lg text-sm font-bold hover:bg-emerald-700 transition">
+                                生成 CSV
+                            </button>
+                            <button v-if="exportText" @click="copyExport" class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 transition" title="複製到剪貼簿">
+                                <i class="fa-regular fa-copy"></i>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
 
     </main>
 
-    <transition name="slide-up">
-        <div v-if="showReportingModal" class="fixed inset-0 bg-slate-100 z-[80] flex flex-col">
-            <div class="bg-white px-4 py-3 border-b flex justify-between items-center shadow-sm shrink-0">
-                <h2 class="font-bold text-lg text-slate-800"><i class="fa-solid fa-file-invoice-dollar text-indigo-500"></i> 業績回報</h2>
-                <button @click="closeReportingModal" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500"><i class="fa-solid fa-times"></i></button>
-            </div>
-
-            <div class="p-4 bg-white border-b shrink-0">
-                <label class="text-xs font-bold text-slate-400 block mb-1">選擇廠商 (預設: 五寮尖)</label>
-                <select v-model="reportingVendorId" class="w-full bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-lg p-3 mb-3 outline-none focus:ring-2 focus:ring-indigo-500">
-                    <option v-for="v in sortedVendorList" :key="v.id" :value="v.id">
-                        {{ v.displayName }} ({{ getVendorShiftCount(v.id) }}場)
-                    </option>
-                </select>
-
-                <div v-if="reportingData" class="grid grid-cols-3 gap-2 text-center bg-indigo-50 p-2 rounded-lg border border-indigo-100">
+    <transition name="fade">
+        <div v-if="salesReportModal.open" class="fixed inset-0 bg-slate-900/90 z-[70] flex items-center justify-center p-4">
+            <div class="bg-white w-full max-w-4xl h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+                <div class="p-4 bg-slate-50 border-b flex justify-between items-center shrink-0">
                     <div>
-                        <div class="text-[10px] text-indigo-400">平均業績</div>
-                        <div class="text-sm font-bold text-indigo-700 font-mono">${{ Math.round(reportingData.avg).toLocaleString() }}</div>
+                        <h3 class="font-bold text-lg text-slate-800"><i class="fa-solid fa-file-invoice-dollar text-emerald-600 mr-2"></i>業績回報中心</h3>
+                        <p class="text-xs text-slate-500">請選擇廠商並填寫當日業績</p>
                     </div>
-                    <div>
-                        <div class="text-[10px] text-indigo-400">P1 總額</div>
-                        <div class="text-sm font-bold text-slate-600 font-mono">${{ reportingData.p1Total.toLocaleString() }}</div>
-                    </div>
-                    <div>
-                        <div class="text-[10px] text-indigo-400">P2 總額</div>
-                        <div class="text-sm font-bold text-slate-600 font-mono">${{ reportingData.p2Total.toLocaleString() }}</div>
+                    <button @click="salesReportModal.open=false" class="text-slate-400 hover:text-slate-600 bg-white p-2 rounded-full shadow-sm"><i class="fa-solid fa-times"></i></button>
+                </div>
+
+                <div class="p-4 border-b bg-white flex flex-col md:flex-row gap-4 items-center shrink-0">
+                    <select v-model="salesReportModal.vendorId" class="w-full md:w-1/3 p-2 border rounded-lg bg-slate-50 font-bold text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500">
+                        <option v-for="v in sortedVendors" :key="v.id" :value="v.id">{{ v.displayName }} ({{getShiftCount(v.id)}}場)</option>
+                    </select>
+                    
+                    <div class="flex-grow grid grid-cols-3 gap-2 w-full">
+                        <div class="bg-emerald-50 p-2 rounded-lg text-center border border-emerald-100">
+                            <div class="text-[10px] text-emerald-600">已回報總業績</div>
+                            <div class="font-bold text-emerald-700 font-mono">${{ reportStats.totalSales.toLocaleString() }}</div>
+                        </div>
+                        <div class="bg-blue-50 p-2 rounded-lg text-center border border-blue-100">
+                            <div class="text-[10px] text-blue-600">預估租金成本</div>
+                            <div class="font-bold text-blue-700 font-mono">${{ reportStats.totalRent.toLocaleString() }}</div>
+                        </div>
+                        <div class="bg-amber-50 p-2 rounded-lg text-center border border-amber-100">
+                            <div class="text-[10px] text-amber-600">平均單場業績</div>
+                            <div class="font-bold text-amber-700 font-mono">${{ reportStats.avgSales.toLocaleString() }}</div>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="flex-grow overflow-y-auto p-4 custom-scroll">
-                <div v-if="reportingShifts.length === 0" class="text-center text-slate-400 mt-10">此廠商無排班資料</div>
-                
-                <div v-for="shift in reportingShifts" :key="shift.id" class="bento-card p-3 mb-3 flex flex-col gap-2 border-l-4" :class="shift.status==='leave'?'border-l-red-400 opacity-75':'border-l-emerald-400'">
-                    <div class="flex justify-between items-center border-b border-slate-100 pb-2">
-                        <div>
-                            <span class="font-bold text-slate-700">{{ shift.date }}</span>
-                            <span class="text-xs text-slate-400 ml-2">{{ shift.station }}</span>
-                        </div>
-                        <select v-model="shift.status" @change="saveShift(shift)" class="text-xs bg-slate-100 rounded px-2 py-1 border-none outline-none" :class="shift.status==='leave'?'text-red-500 font-bold':''">
-                            <option value="active">出席</option>
-                            <option value="leave">請假</option>
-                        </select>
-                    </div>
-
-                    <div v-if="shift.status !== 'leave'" class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label class="text-[10px] text-slate-400">業績金額</label>
-                            <div class="relative">
-                                <span class="absolute left-2 top-1.5 text-slate-400 text-xs">$</span>
-                                <input type="number" v-model.number="shift.sales" @blur="saveShift(shift)" class="w-full pl-5 pr-2 py-1.5 bg-slate-50 border rounded text-sm font-mono focus:bg-white focus:border-indigo-500 outline-none" placeholder="0">
+                <div class="flex-grow overflow-y-auto custom-scroll bg-slate-50 p-4">
+                    <div v-if="reportShifts.length === 0" class="text-center text-gray-400 mt-10">此廠商無排班資料</div>
+                    <div v-else class="space-y-2">
+                        <div v-for="shift in reportShifts" :key="shift.id" 
+                             class="bg-white border rounded-lg p-3 flex flex-col md:flex-row gap-3 items-center shadow-sm transition-all"
+                             :class="{'opacity-60 bg-gray-100': shift.status === 'leave'}">
+                            
+                            <div class="w-full md:w-32 flex justify-between md:block">
+                                <div class="font-bold text-slate-700">{{ shift.date }}</div>
+                                <div class="text-xs text-slate-500">{{ shift.station }}</div>
                             </div>
-                        </div>
-                        <div>
-                            <label class="text-[10px] text-slate-400">備註/調整</label>
-                            <input type="text" v-model="shift.timeAdjustment" @blur="saveShift(shift)" class="w-full px-2 py-1.5 bg-slate-50 border rounded text-sm focus:bg-white focus:border-indigo-500 outline-none" placeholder="如: 晚到...">
+
+                            <div class="w-full md:w-32">
+                                <select v-model="shift.status" @change="saveShift(shift)" class="w-full text-xs p-1.5 border rounded" :class="shift.status==='active'?'text-green-600':'text-red-500'">
+                                    <option value="active">✅ 正常出席</option>
+                                    <option value="leave">🛑 請假/取消</option>
+                                </select>
+                            </div>
+
+                            <div class="flex-grow flex gap-2 w-full">
+                                <div class="relative w-1/2">
+                                    <span class="absolute left-2 top-1.5 text-gray-400 text-xs">$</span>
+                                    <input type="number" v-model.lazy="shift.sales" @change="saveShift(shift)" placeholder="業績" :disabled="shift.status==='leave'"
+                                           class="w-full pl-5 p-1.5 border rounded text-sm font-mono focus:ring-2 focus:ring-emerald-500 outline-none">
+                                </div>
+                                <input type="text" v-model.lazy="shift.timeAdjustment" @change="saveShift(shift)" placeholder="備註 (如: 晚到)" 
+                                       class="w-1/2 p-1.5 border rounded text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
+                            </div>
+
+                            <button @click="deleteShift(shift)" class="text-gray-300 hover:text-red-500 px-2" title="刪除排班">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -314,28 +517,34 @@
         </div>
     </transition>
 
-    <div v-if="showPKModal" class="fixed inset-0 bg-slate-900/80 z-[70] flex items-center justify-center p-4" @click.self="showPKModal = false">
-        <div class="bg-white w-full max-w-sm rounded-xl overflow-hidden shadow-2xl">
-            <div class="p-3 border-b bg-slate-50 font-bold text-center">選擇 PK 廠商 (最多4家)</div>
-            <div class="h-64 overflow-y-auto p-2">
-                <div v-for="v in sortedVendorList" :key="v.id" @click="togglePK(v.id)" class="p-2 flex justify-between items-center border-b cursor-pointer hover:bg-slate-50">
-                    <span class="text-sm">{{ v.displayName }}</span>
-                    <div class="w-4 h-4 rounded-full border" :class="pkList.includes(v.id) ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300'"></div>
-                </div>
-            </div>
-            <div class="p-3 border-t text-center">
-                <button @click="showPKModal = false" class="bg-indigo-600 text-white w-full py-2 rounded-lg font-bold">完成</button>
+    <div v-if="showInput" class="fixed inset-0 bg-slate-900/90 z-[80] flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-lg rounded-2xl p-6 shadow-xl">
+            <h3 class="font-bold text-lg mb-2">匯入 CSV</h3>
+            <textarea v-model="csvInput" class="w-full h-40 p-3 border rounded-lg font-mono text-xs mb-4 focus:ring-2 focus:ring-indigo-500" placeholder="Paste content here..."></textarea>
+            <div class="flex justify-end gap-2">
+                <button @click="showInput=false" class="px-4 py-2 text-gray-500 hover:bg-gray-100 rounded-lg">取消</button>
+                <button @click="processCSV" class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold shadow-md hover:bg-indigo-700">解析資料</button>
             </div>
         </div>
     </div>
 
-    <div v-if="showInput" class="fixed inset-0 bg-slate-900/90 z-[90] flex items-center justify-center p-4">
-        <div class="bg-white w-full max-w-2xl rounded-xl p-4 flex flex-col h-[60vh]">
-            <h3 class="font-bold mb-2">匯入 CSV</h3>
-            <textarea v-model="csvInput" class="flex-grow border rounded p-2 text-xs font-mono mb-2" placeholder="貼上 CSV..."></textarea>
-            <div class="flex gap-2">
-                <button @click="processCSV" class="flex-1 bg-emerald-600 text-white py-2 rounded font-bold">解析</button>
-                <button @click="showInput = false" class="flex-1 bg-slate-200 text-slate-700 py-2 rounded">取消</button>
+    <div v-if="showPKModal" class="fixed inset-0 bg-slate-900/80 z-[80] flex items-center justify-center p-4" @click.self="showPKModal=false">
+        <div class="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[70vh]">
+            <div class="p-4 bg-gray-50 border-b font-bold flex justify-between">
+                <span>PK 戰情室 ({{pkList.length}}/8)</span>
+                <button @click="pkList=[]" class="text-xs text-red-500">清空</button>
+            </div>
+            <div class="overflow-y-auto p-2 custom-scroll">
+                <div v-for="v in sortedVendors" :key="v.id" class="flex items-center p-3 hover:bg-gray-50 rounded-lg cursor-pointer" @click="togglePK(v.id)">
+                    <div class="w-4 h-4 border rounded mr-3 flex items-center justify-center" :class="pkList.includes(v.id) ? 'bg-indigo-600 border-indigo-600' : 'border-gray-300'">
+                        <i v-if="pkList.includes(v.id)" class="fa-solid fa-check text-white text-[10px]"></i>
+                    </div>
+                    <div class="flex-grow">
+                        <div class="font-bold text-sm text-gray-700">{{ v.displayName }}</div>
+                        <div class="text-[10px] text-gray-400">{{ getShiftCount(v.id) }}場</div>
+                    </div>
+                    <div v-if="pkList.includes(v.id)" class="w-3 h-3 rounded-full" :class="getPKColorClass(v.id)"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -343,234 +552,341 @@
 </div>
 
 <script>
-    const { createApp, ref, computed, onMounted, watch } = Vue;
-    
-    // Cloud Service Mock
-    const Cloud = {
-        save: async (k, d) => localStorage.setItem('v97_'+k, JSON.stringify(d)),
-        load: async (k) => JSON.parse(localStorage.getItem('v97_'+k))
+    const { createApp, ref, computed, onMounted, nextTick, watch } = Vue;
+
+    const CloudService = {
+        save: async (k, d) => new Promise(r => setTimeout(() => { localStorage.setItem('v99_'+k, JSON.stringify(d)); r(); }, 500)),
+        load: async (k) => new Promise(r => { const d = localStorage.getItem('v99_'+k); r(d ? JSON.parse(d) : null); })
     };
 
     createApp({
         setup() {
-            // UI State
+            // State
             const currentView = ref('kanban');
-            const showMobileMenu = ref(false);
-            const showReportingModal = ref(false);
-            const showPKModal = ref(false);
+            const navItems = [
+                { key: 'kanban', label: '看板', icon: 'fa-solid fa-columns' },
+                { key: 'matrix', label: '總表', icon: 'fa-solid fa-table-cells' },
+                { key: 'analysis', label: '分析', icon: 'fa-solid fa-chart-line' },
+                { key: 'vendor', label: '廠商', icon: 'fa-solid fa-store' },
+                { key: 'settings', label: '設定', icon: 'fa-solid fa-toolbox' }
+            ];
+            const mobileMenuOpen = ref(false);
             const showInput = ref(false);
-            const isSaving = ref(false);
             const csvInput = ref('');
+            const isSaving = ref(false);
+            const showPKModal = ref(false);
+            const pkList = ref([]);
+            const vendorSearch = ref('');
+            const exportText = ref('');
             
+            // New Shift State
+            const manualShift = ref({
+                date: new Date().toISOString().slice(0,10),
+                drawer: '雙連',
+                station: '',
+                vendorId: ''
+            });
+
             // Data
             const schedules = ref([]);
             const vendorList = ref([]);
-            const pkList = ref([]);
-            const reportingVendorId = ref('');
-
-            // --- Business Logic ---
             
-            // 1. Sorted Vendors (Wuliaojian first, then by count)
-            const sortedVendorList = computed(() => {
-                return [...vendorList.value].sort((a, b) => {
-                    // Wuliaojian Priority
-                    if (a.displayName.includes('五寮尖')) return -1;
-                    if (b.displayName.includes('五寮尖')) return 1;
-                    // Then by Shift Count (Desc)
-                    const countA = schedules.value.filter(s => s.vendorId === a.id).length;
-                    const countB = schedules.value.filter(s => s.vendorId === b.id).length;
-                    return countB - countA;
+            // Performance Modal State
+            const salesReportModal = ref({ open: false, vendorId: '' });
+
+            // --- Core Logic ---
+            const getShiftCount = (vid) => schedules.value.filter(s => s.vendorId === vid).length;
+            
+            // Sorting Logic: Sort vendors by shift count descending for list
+            const sortedVendors = computed(() => {
+                return [...vendorList.value].sort((a,b) => getShiftCount(b.id) - getShiftCount(a.id));
+            });
+            
+            // Filtered Vendors for Search in Vendor View
+            const filteredVendors = computed(() => {
+                const term = vendorSearch.value.toLowerCase();
+                if (!term) return sortedVendors.value;
+                return sortedVendors.value.filter(v => 
+                    v.displayName.toLowerCase().includes(term) || 
+                    v.aliases.some(a => a.toLowerCase().includes(term))
+                );
+            });
+
+            // Set Default Vendor Logic
+            const setDefaultVendor = () => {
+                const goat = vendorList.value.find(v => v.displayName.includes('五寮尖'));
+                if (goat) {
+                    salesReportModal.value.vendorId = goat.id;
+                } else if (sortedVendors.value.length > 0) {
+                    salesReportModal.value.vendorId = sortedVendors.value[0].id;
+                }
+            };
+
+            const processCSV = async () => {
+                if (!csvInput.value) return;
+                const parsed = Papa.parse(csvInput.value, { header: false, skipEmptyLines: true });
+                const rows = parsed.data;
+                const newSchedules = [];
+                const colMap = {};
+                if (rows.length > 1) {
+                    rows[0].forEach((c, i) => { if(i>0){const m=c.match(/(\d{1,2})\/(\d{1,2})/);if(m)colMap[i]=`${parseInt(m[1])>=11?2025:2026}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}`}});
+                    for (let i=1; i<rows.length; i++) {
+                        const row = rows[i]; if(!row[0]) continue;
+                        let drawer = row[0].includes('雙連')?'雙連':row[0].includes('士林')?'士林':'石牌';
+                        row.forEach((cell, idx) => {
+                            if(idx>0 && colMap[idx] && cell.trim()) {
+                                cell.split(/[,，、]/).forEach(raw => {
+                                    if(raw.trim()) newSchedules.push({id:crypto.randomUUID(), date:colMap[idx], drawer, station:row[0], rawStaff:raw.trim(), status:'active', sales:0, timeAdjustment:''});
+                                });
+                            }
+                        });
+                    }
+                    schedules.value = newSchedules;
+                    // Sync Vendors
+                    const rawNames = [...new Set(newSchedules.map(s=>s.rawStaff))];
+                    rawNames.forEach(r => {
+                        if(!vendorList.value.some(v=>v.aliases.includes(r))) vendorList.value.push({id:crypto.randomUUID().substring(0,8), displayName:r, aliases:[r], category:''});
+                    });
+                    linkVendors();
+                    showInput.value=false;
+                    await saveAll();
+                    setDefaultVendor();
+                }
+            };
+
+            // NEW: Add Manual Shift
+            const addManualShift = async () => {
+                if(!manualShift.value.date || !manualShift.value.station || !manualShift.value.vendorId) {
+                    Swal.fire('欄位未填', '請填寫完整日期、站點與廠商', 'warning');
+                    return;
+                }
+                
+                const vendor = vendorList.value.find(v => v.id === manualShift.value.vendorId);
+                const rawName = vendor ? vendor.displayName : 'Unknown';
+
+                schedules.value.push({
+                    id: crypto.randomUUID(),
+                    date: manualShift.value.date,
+                    drawer: manualShift.value.drawer,
+                    station: manualShift.value.station,
+                    vendorId: manualShift.value.vendorId,
+                    rawStaff: rawName,
+                    status: 'active',
+                    sales: 0,
+                    timeAdjustment: ''
                 });
-            });
 
-            // 2. Reporting Modal Logic
-            const openReportingModal = () => {
-                // Default to Wuliaojian if exists, else first
-                const defaultV = sortedVendorList.value.find(v => v.displayName.includes('五寮尖'));
-                reportingVendorId.value = defaultV ? defaultV.id : (sortedVendorList.value[0]?.id || '');
-                showReportingModal.value = true;
-                showMobileMenu.value = false;
-            };
-            
-            const closeReportingModal = () => showReportingModal.value = false;
-
-            const reportingShifts = computed(() => {
-                if (!reportingVendorId.value) return [];
-                return schedules.value
-                    .filter(s => s.vendorId === reportingVendorId.value)
-                    .sort((a,b) => new Date(a.date) - new Date(b.date)); // Chronological
-            });
-
-            const reportingData = computed(() => {
-                const shifts = reportingShifts.value.filter(s => s.status !== 'leave');
-                const total = shifts.reduce((sum, s) => sum + (s.sales || 0), 0);
-                const avg = shifts.length ? total / shifts.length : 0;
+                await saveAll();
+                Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: '排班已新增', showConfirmButton: false, timer: 1500 });
                 
-                // P1/P2
-                const p1 = shifts.filter(s => [11,12,1].includes(parseInt(s.date.split('-')[1]))).reduce((s,c)=>s+(c.sales||0),0);
-                const p2 = shifts.filter(s => [2,3,4].includes(parseInt(s.date.split('-')[1]))).reduce((s,c)=>s+(c.sales||0),0);
-                
-                return { avg, p1Total: p1, p2Total: p2 };
-            });
-
-            const saveShift = async (shift) => {
-                isSaving.value = true;
-                await Cloud.save('schedules', schedules.value);
-                setTimeout(() => isSaving.value = false, 500);
+                // Reset minimal fields
+                manualShift.value.station = ''; 
+                // Keep date/drawer/vendor as user might add multiple similar shifts
             };
 
-            // 3. Analysis Logic (Updated with Station Dist)
-            const analysisStats = computed(() => {
-                return sortedVendorList.value.map(v => {
-                    const shifts = schedules.value.filter(s => s.vendorId === v.id && s.status !== 'leave');
-                    
-                    const p1Shifts = shifts.filter(s => [11,12,1].includes(parseInt(s.date.split('-')[1])));
-                    const p2Shifts = shifts.filter(s => [2,3,4].includes(parseInt(s.date.split('-')[1])));
-                    
-                    // Rent Calculation
-                    const calc = (c) => {
-                        const base = c * 800;
-                        const rate = c >= 20 ? 0.85 : c >= 10 ? 0.9 : 1;
-                        return { total: Math.round(base * rate) };
-                    };
-                    
-                    // Station Distribution
-                    const total = shifts.length || 1;
-                    const sl = shifts.filter(s => s.drawer === '雙連').length;
-                    const si = shifts.filter(s => s.drawer === '士林').length;
-                    const sp = shifts.filter(s => s.drawer === '石牌').length;
-                    const distStr = `${Math.round(sl/total*100)}% / ${Math.round(si/total*100)}% / ${Math.round(sp/total*100)}%`;
-
+            // NEW: Generate Export
+            const generateExport = () => {
+                const data = schedules.value.map(s => {
+                    const v = vendorList.value.find(vn => vn.id === s.vendorId);
                     return {
-                        name: v.displayName,
-                        p1Count: p1Shifts.length,
-                        p2Count: p2Shifts.length,
-                        p1Rent: calc(p1Shifts.length),
-                        p2Rent: calc(p2Shifts.length),
-                        distStr
+                        Date: s.date,
+                        Area: s.drawer,
+                        Station: s.station,
+                        Vendor: v ? v.displayName : s.rawStaff,
+                        Status: s.status,
+                        Sales: s.sales,
+                        Note: s.timeAdjustment
                     };
-                });
-            });
+                }).sort((a,b) => new Date(a.Date) - new Date(b.Date));
 
+                exportText.value = Papa.unparse(data);
+            };
+
+            const copyExport = () => {
+                navigator.clipboard.writeText(exportText.value);
+                Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: '已複製到剪貼簿', showConfirmButton: false, timer: 1500 });
+            };
+
+            const linkVendors = () => schedules.value.forEach(s => { const v = vendorList.value.find(vn => vn.aliases.includes(s.rawStaff)); if(v) s.vendorId = v.id; });
+            const saveAll = async () => { isSaving.value=true; await CloudService.save('s', schedules.value); await CloudService.save('v', vendorList.value); isSaving.value=false; };
+
+            // --- Analysis ---
             const financialSummary = computed(() => {
                 let p1=0, p2=0;
-                analysisStats.value.forEach(s => { p1 += s.p1Rent.total; p2 += s.p2Rent.total; });
-                return { p1Total: p1, p2Total: p2, growth: p1>0 ? Math.round(((p2-p1)/p1)*100) : 0 };
+                analysisStats.value.forEach(s => { p1+=s.p1Rent.total; p2+=s.p2Rent.total; });
+                return { p1Total:p1, p2Total:p2, growth: p1>0 ? Math.round(((p2-p1)/p1)*100) : 0 };
             });
 
-            // 4. Core Logic (CSV, Kanban, etc.)
-            const processCSV = () => {
-                if(!csvInput.value) return;
-                const parsed = Papa.parse(csvInput.value, { header: false, skipEmptyLines: true });
-                if(parsed.data.length < 2) return;
-                
-                const newSched = [];
-                const colMap = {};
-                parsed.data[0].forEach((c, i) => {
-                    const m = c.match(/(\d{1,2})\/(\d{1,2})/);
-                    if(m) colMap[i] = `${parseInt(m[1])>=11?2025:2026}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}`;
-                });
+            const analysisStats = computed(() => {
+                return vendorList.value.map(v => {
+                    const shifts = schedules.value.filter(s => s.vendorId===v.id && s.status!=='leave');
+                    const p1S = shifts.filter(s => [11,12,1].includes(parseInt(s.date.split('-')[1])));
+                    const p2S = shifts.filter(s => [2,3,4].includes(parseInt(s.date.split('-')[1])));
+                    
+                    const calcRent = (cnt) => { const base=cnt*800; const disc=cnt>=20?0.85:cnt>=10?0.9:1; return {total:Math.round(base*disc), discount:disc}; };
+                    
+                    const getDist = (list) => {
+                        const t = list.length || 1;
+                        return { 
+                            sl: Math.round(list.filter(s=>s.drawer==='雙連').length/t*100),
+                            slin: Math.round(list.filter(s=>s.drawer==='士林').length/t*100),
+                            sp: Math.round(list.filter(s=>s.drawer==='石牌').length/t*100)
+                        };
+                    };
 
-                for(let i=1; i<parsed.data.length; i++){
-                    const row = parsed.data[i];
-                    if(!row[0]) continue;
-                    const drawer = row[0].includes('雙連')?'雙連':row[0].includes('士林')?'士林':'石牌';
-                    row.forEach((cell, idx) => {
-                        if(idx===0 || !colMap[idx] || !cell.trim()) return;
-                        cell.split(/[,，、]/).forEach(r => {
-                            if(r.trim()) newSched.push({ id: crypto.randomUUID(), date: colMap[idx], drawer, station: row[0], rawStaff: r.trim(), status: 'active', sales: 0 });
-                        });
+                    return {
+                        name: v.displayName, category: v.category,
+                        p1Count: p1S.length, p1Rent: calcRent(p1S.length), p1Dist: getDist(p1S),
+                        p2Count: p2S.length, p2Rent: calcRent(p2S.length), p2Dist: getDist(p2S),
+                        growth: p1S.length>0 ? Math.round(((p2S.length-p1S.length)/p1S.length)*100) : 0
+                    };
+                }).filter(s => s.p1Count+s.p2Count > 0).sort((a,b) => (b.p1Count+b.p2Count) - (a.p1Count+a.p2Count));
+            });
+
+            const platformInsights = computed(() => {
+                // Top 3 by Station
+                const stations = drawers.map(d => {
+                    const stationShifts = schedules.value.filter(s => s.drawer === d.key && s.status !== 'leave');
+                    const counts = {};
+                    stationShifts.forEach(s => { 
+                        const name = getDisplayStaff(s); 
+                        counts[name] = (counts[name]||0)+1; 
                     });
-                }
-                schedules.value = newSched;
-                // Auto Gen Vendors
-                const raws = [...new Set(newSched.map(s => s.rawStaff))];
-                raws.forEach(r => {
-                    if(!vendorList.value.some(v => v.aliases.includes(r))) vendorList.value.push({ id: crypto.randomUUID(), displayName: r, aliases: [r] });
+                    const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([n,c])=>({name:n, count:c}));
+                    return { name: d.name, color: d.colorClass, top3: sorted };
                 });
-                // Link
-                schedules.value.forEach(s => { const v = vendorList.value.find(vn => vn.aliases.includes(s.rawStaff)); if(v) s.vendorId = v.id; });
-                
-                Cloud.save('schedules', schedules.value);
-                Cloud.save('vendors', vendorList.value);
-                showInput.value = false;
-            };
 
-            const togglePK = (vid) => {
-                if(pkList.value.includes(vid)) pkList.value = pkList.value.filter(id => id !== vid);
-                else { if(pkList.value.length < 4) pkList.value.push(vid); }
-            };
+                // Category Balance
+                const activeShifts = schedules.value.filter(s => s.status !== 'leave');
+                const total = activeShifts.length || 1;
+                const catCounts = {};
+                activeShifts.forEach(s => {
+                    const v = vendorList.value.find(vn=>vn.id===s.vendorId);
+                    const cat = (v && v.category) ? v.category : '未分類';
+                    catCounts[cat] = (catCounts[cat]||0)+1;
+                });
+                const categories = Object.entries(catCounts)
+                    .map(([n,c])=>({name:n, count:c, pct:Math.round(c/total*100)}))
+                    .sort((a,b)=>b.count-a.count);
 
-            const getVendorName = (id) => { const v = vendorList.value.find(vn => vn.id === id); return v ? v.displayName : 'Unknown'; };
-            const getVendorShiftCount = (id) => schedules.value.filter(s => s.vendorId === id).length;
+                return { stations, categories };
+            });
+
+            // --- Reporting Modal Logic ---
+            const openPerformanceModal = () => {
+                salesReportModal.value.open = true;
+                if(!salesReportModal.value.vendorId) setDefaultVendor();
+            };
             
-            // Kanban Helpers
-            const drawers = [{key:'雙連',name:'雙連',borderColor:'border-blue-500'},{key:'士林',name:'士林',borderColor:'border-emerald-500'},{key:'石牌',name:'石牌',borderColor:'border-amber-500'}];
-            const getShifts = (d, k) => schedules.value.filter(s => s.date === d && s.drawer === k);
-            const getDrawerShiftCount = (k) => schedules.value.filter(s => s.drawer === k).length;
-            const calendarWeeks = computed(() => {
-                const dates = [...new Set(schedules.value.map(s=>s.date))].sort();
-                if(!dates.length) return [];
-                const start = new Date(dates[0]); start.setDate(start.getDate()-(start.getDay()===0?6:start.getDay()-1));
-                const end = new Date(dates[dates.length-1]);
-                const weeks = []; let curr = new Date(start); let lm = -1;
-                while(curr<=end){
-                    const days = []; let label = ''; let isMs = false;
-                    for(let i=0;i<5;i++){
-                        const dStr = curr.toISOString().slice(0,10); const m = curr.getMonth()+1;
-                        if(m!==lm && i===0) { label=`${curr.getFullYear()} / ${m}月`; isMs=true; lm=m; }
-                        days.push({dateStr:dStr, weekday:['日','一','二','三','四','五','六'][curr.getDay()], isToday: new Date().toISOString().slice(0,10)===dStr});
-                        curr.setDate(curr.getDate()+1);
-                    }
-                    weeks.push({id:weeks.length, monthLabel:label, isMonthStart:isMs, days});
-                    curr.setDate(curr.getDate()+2);
+            const reportShifts = computed(() => {
+                if(!salesReportModal.value.vendorId) return [];
+                return schedules.value
+                    .filter(s => s.vendorId === salesReportModal.value.vendorId)
+                    .sort((a,b) => new Date(a.date) - new Date(b.date));
+            });
+
+            const reportStats = computed(() => {
+                const active = reportShifts.value.filter(s => s.status === 'active');
+                const totalSales = active.reduce((sum, s) => sum + (parseInt(s.sales)||0), 0);
+                const count = active.length;
+                const discount = count >= 20 ? 0.85 : count >= 10 ? 0.9 : 1;
+                const totalRent = Math.round(count * 800 * discount);
+                return { totalSales, totalRent, avgSales: count > 0 ? Math.round(totalSales / count) : 0 };
+            });
+
+            const saveShift = async (shift) => await saveAll();
+            
+            const deleteShift = async (shift) => {
+                if(confirm('確定刪除此班表？此操作無法復原。')) {
+                    schedules.value = schedules.value.filter(s => s.id !== shift.id);
+                    await saveAll();
                 }
-                return weeks;
-            });
-
-            // Matrix Helpers
-            const matrixHeaders = computed(() => [...new Set(schedules.value.map(s=>s.date))].sort().map(d => ({date:d, simpleDate:d.substring(5).replace('-','/')})));
-            const matrixRows = computed(() => {
-                const rows = [];
-                ['雙連','士林','石牌'].forEach(dr => {
-                    const stations = [...new Set(schedules.value.filter(s=>s.drawer===dr).map(s=>s.station))];
-                    stations.forEach(st => {
-                        const cells = matrixHeaders.value.map(h => {
-                            const shift = schedules.value.find(s=>s.date===h.date && s.station===st);
-                            return shift ? { shift, name: getVendorName(shift.vendorId), vendorId: shift.vendorId } : null;
-                        });
-                        rows.push({ key: st, station: st, cells });
-                    });
-                });
-                return rows;
-            });
-
-            const getPKColorClass = (vid) => {
-                const idx = pkList.value.indexOf(vid);
-                return idx !== -1 ? `pk-${idx}` : '';
             };
-            const navTo = (v) => { currentView.value = v; showMobileMenu.value = false; };
-            const truncateName = (n) => n.length > 3 ? n.substring(0,2)+'..' : n;
+            
+            // --- Vendor Actions ---
+            const addNewVendor = () => vendorList.value.unshift({id:crypto.randomUUID().substring(0,8), displayName:'新廠商', aliases:[], category:''});
+            const addAlias = async (v) => { const {value} = await Swal.fire({input:'text', title:'新增別名(CSV對照用)'}); if(value) { v.aliases.push(value); linkVendors(); await saveAll(); } };
+            const removeAlias = async (v,a) => { v.aliases = v.aliases.filter(x=>x!==a); await saveAll(); };
+            const deleteVendor = async (vid) => {
+                if(confirm('確定刪除此廠商？這不會刪除班表，但會解除班表與此廠商的關聯。')) {
+                    vendorList.value = vendorList.value.filter(v => v.id !== vid);
+                    await saveAll();
+                }
+            };
+            const simulateVendorLogin = (vendor) => {
+                salesReportModal.value.vendorId = vendor.id;
+                salesReportModal.value.open = true;
+                Swal.fire({
+                    toast: true, position: 'top-end', icon: 'success', 
+                    title: `模擬登入: ${vendor.displayName}`, showConfirmButton: false, timer: 2000 
+                });
+            };
+
+            // --- Helpers (Views) ---
+            const drawers = [{key:'雙連',name:'雙連',colorClass:'bg-blue-500'},{key:'士林',name:'士林',colorClass:'bg-emerald-500'},{key:'石牌',name:'石牌',colorClass:'bg-amber-500'}];
+            const getDisplayStaff = (s) => { const v = vendorList.value.find(vn => vn.id === s.vendorId); return v ? v.displayName : s.rawStaff; };
+            const getShifts = (d,k) => schedules.value.filter(s => s.date===d && s.drawer===k);
+            const getDrawerShiftCount = (k) => schedules.value.filter(s => s.drawer===k).length;
+            const truncateName = (n) => n.length > 4 ? n.substring(0,3)+'..' : n;
+            const handleSyncScroll = (e) => document.querySelectorAll('.sync-scroll-target').forEach(el => el.scrollTop = e.target.scrollTop);
+            const getPKColorClass = (vid) => { const idx = pkList.value.indexOf(vid); return idx===-1?'':`pk-${idx}`; };
+            const togglePK = (vid) => {
+                const idx = pkList.value.indexOf(vid);
+                if(idx > -1) pkList.value.splice(idx,1);
+                else if(pkList.value.length < 8) pkList.value.push(vid);
+            };
+            const openShiftDetail = (shift) => { salesReportModal.value.vendorId = shift.vendorId; salesReportModal.value.open = true; };
+            
+            // Matrix Data
+            const calendarWeeks = computed(() => {
+                const dates = [...new Set(schedules.value.map(s=>s.date))].sort(); if(dates.length===0) return [];
+                const start=new Date(dates[0]); start.setDate(start.getDate()-(start.getDay()===0?6:start.getDay()-1));
+                const end=new Date(dates[dates.length-1]);
+                const w=[]; let c=new Date(start); let lm=-1;
+                while(c<=end){
+                    const d=[]; let l=''; let im=false;
+                    for(let i=0;i<5;i++){
+                        const ds=c.toISOString().slice(0,10); const m=c.getMonth()+1;
+                        if(m!==lm && i===0){l=`${c.getFullYear()}/${m}`; im=true; lm=m;}
+                        d.push({dateStr:ds, dayNum:c.getDate(), weekday:['日','一','二','三','四','五','六'][c.getDay()], isToday:new Date().toISOString().slice(0,10)===ds});
+                        c.setDate(c.getDate()+1);
+                    }
+                    w.push({id:w.length, monthLabel:l, isMonthStart:im, days:d}); c.setDate(c.getDate()+2);
+                }
+                return w;
+            });
+            const matrixHeaders = computed(() => [...new Set(schedules.value.map(s => s.date))].sort().map(d => ({ simpleDate: d.substring(5).replace('-','/'), dayName: `(${new Date(d).toLocaleDateString('zh-TW',{weekday:'short'})})`, date: d })));
+            const matrixGroups = computed(() => {
+                const grps = [];
+                drawers.forEach(dr => {
+                    const st = [...new Set(schedules.value.filter(s => s.drawer===dr.key).map(s => s.station))];
+                    const rows = st.map(station => ({
+                        station, isShilin: dr.key==='士林',
+                        cells: matrixHeaders.value.map(h => {
+                            const m = schedules.value.find(s => s.date === h.date && s.station === station);
+                            return m ? { name: getDisplayStaff(m), status: m.status, vendorId: m.vendorId, shift: m } : null;
+                        })
+                    }));
+                    if(rows.length) grps.push({name: dr.name, rows, badgeClass: dr.colorClass});
+                });
+                return grps;
+            });
 
             onMounted(async () => {
-                const s = await Cloud.load('schedules');
-                const v = await Cloud.load('vendors');
-                if(s) schedules.value = s;
-                if(v) vendorList.value = v;
+                const s = await CloudService.load('s'); const v = await CloudService.load('v');
+                if(s) schedules.value = s; if(v) vendorList.value = v;
+                linkVendors();
+                setDefaultVendor();
             });
 
             return {
-                currentView, showMobileMenu, showReportingModal, showPKModal, showInput, isSaving, csvInput,
-                navTo, processCSV, openReportingModal, closeReportingModal, saveShift,
-                reportingVendorId, reportingShifts, reportingData,
-                sortedVendorList, getVendorShiftCount, getVendorName,
-                pkList, togglePK, getPKColorClass,
-                drawers, calendarWeeks, getShifts, getDrawerShiftCount,
-                analysisStats, financialSummary,
-                matrixHeaders, matrixRows, truncateName,
-                addNewVendor: () => vendorList.value.push({id:crypto.randomUUID(), displayName:'新廠商', aliases:[]}),
-                editVendor: (v) => Swal.fire('功能開發中', `編輯 ${v.displayName}`, 'info'),
-                openShiftEdit: (s) => openReportingModal() // Quick link to report
+                currentView, mobileMenuOpen, navItems, isSaving, showInput, csvInput, showPKModal, pkList, salesReportModal,
+                drawers, getDrawerShiftCount, calendarWeeks, getShifts, getDisplayStaff, truncateName, getPKColorClass, handleSyncScroll,
+                matrixHeaders, matrixGroups, openShiftDetail,
+                analysisStats, financialSummary, platformInsights,
+                sortedVendors, filteredVendors, vendorSearch, reportShifts, reportStats, saveShift, deleteShift, openPerformanceModal, togglePK,
+                addNewVendor, addAlias, removeAlias, deleteVendor, simulateVendorLogin, processCSV, getShiftCount,
+                manualShift, addManualShift, exportText, generateExport, copyExport
             };
         }
     }).mount('#app');
